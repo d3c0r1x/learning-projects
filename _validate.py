@@ -16,6 +16,8 @@ PROJECTS = {
     "p2": "project2_ai_review_analyst",
     "p3": "project3_pdf_reports",
     "p4": "project4_payment_gateway",
+    "p5": "project5_telegram_quiz_bot",
+    "p6": "project6_currency_rate_bot",
 }
 
 
@@ -111,6 +113,72 @@ def validate_p4() -> None:
     asyncio.run(run())
 
 
+def validate_p5() -> None:
+    _insert("p5")
+    from db import Database
+    from quiz_api import DEMO_POOL, QuizClient
+
+    async def run() -> None:
+        client = QuizClient(demo_mode=True)
+        questions = await client.fetch_questions(10)
+        assert len(questions) == 10
+        assert len(DEMO_POOL) >= 10
+        assert all(len(q.options) == 4 for q in questions)
+        q = QuizClient._parse({
+            "question": "What is H2O?",
+            "correct_answer": "Water",
+            "incorrect_answers": ["Fire", "Air", "Earth"],
+        })
+        assert q.options[q.correct_index] == "Water"
+        db = Database(os.path.join(tempfile.gettempdir(), "smoke_quiz.db"))
+        if os.path.exists(db.path):
+            os.remove(db.path)
+        await db.init()
+        await db.save_result(1, "alice", 8)
+        await db.save_result(2, "bob", 5)
+        await db.save_result(1, "alice", 10)
+        assert (await db.leaderboard())[0] == ("alice", 10)
+        assert await db.stats(1) == (2, 10)
+
+    asyncio.run(run())
+    print("  [OK] оффлайн-пул вопросов + парсинг OpenTDB + лидерборд SQLite")
+
+
+def validate_p6() -> None:
+    _insert("p6")
+    from cbr_api import CbrClient, parse_cbr_xml
+    from db import Database
+
+    sample = """<?xml version="1.0" encoding="windows-1251"?>
+<ValCurs Date="05.08.2026" name="Foreign Currency Market">
+<Valute ID="R01235"><NumCode>840</NumCode><CharCode>USD</CharCode><Nominal>1</Nominal>
+<Name>Доллар США</Name><Value>91,2345</Value></Valute>
+<Valute ID="R01820"><NumCode>392</NumCode><CharCode>JPY</CharCode><Nominal>100</Nominal>
+<Name>Японская иена</Name><Value>60,8300</Value></Valute>
+</ValCurs>"""
+    rates = parse_cbr_xml(sample.encode("cp1251"))
+    assert rates["USD"].value == 91.2345  # запятая -> точка
+    assert rates["JPY"].per_one == 0.6083  # 60,83 за 100 иен
+
+    async def run() -> None:
+        client = CbrClient(demo_mode=True)
+        all_rates = await client.fetch_rates()
+        assert "USD" in all_rates and "EUR" in all_rates
+        rub = await client.convert("USD", 100)
+        assert rub is not None and rub > 0
+        db = Database(os.path.join(tempfile.gettempdir(), "smoke_rates.db"))
+        if os.path.exists(db.path):
+            os.remove(db.path)
+        await db.init()
+        await db.save_rates(all_rates, "2026-08-05")
+        assert len(await db.history("USD", 7)) == 1
+        await db.set_digest(1, "alice", True)
+        assert [u for u, _ in await db.digest_users()] == [1]
+
+    asyncio.run(run())
+    print("  [OK] парсинг XML ЦБ (байты/кодировка) + демо-курсы + история + подписка")
+
+
 def main() -> None:
     target = sys.argv[1] if len(sys.argv) > 1 else "all"
     checks = {
@@ -118,6 +186,8 @@ def main() -> None:
         "p2": validate_p2,
         "p3": validate_p3,
         "p4": validate_p4,
+        "p5": validate_p5,
+        "p6": validate_p6,
     }
     to_run = list(checks) if target == "all" else [target]
     for key in to_run:
