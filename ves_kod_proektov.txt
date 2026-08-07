@@ -1,6 +1,4 @@
-СВОДНЫЙ ДАМП КОДА УЧЕБНЫХ ПРОЕКТОВ — 104 файлов
-
-======================================================================
+СВОДНЫЙ ДАМП КОДА УЧЕБНЫХ ПРОЕКТОВ — 141 файлов
 
 ======================================================================
 ФАЙЛ: .gitignore
@@ -39,61 +37,12 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-
-======================================================================
-ФАЙЛ: 1.txt
-======================================================================
-роект 1: Telegram-бот "WB Price & Stock Tracker"
-Закрывает требования: "Интеграции с маркетплейсами", "Telegram-боты", "Парсеры".
-Функции: Пользователь отправляет артикул товара Wildberries. Бот получает текущую цену, скидку и остаток на складах, сохраняет историю в локальную БД. Раз в сутки бот проверяет изменения и отправляет push-уведомление, если цена упала или товар заканчивается.
-Ресурсы (API): Публичные endpoints Wildberries (не требуют ключа продавца). Например, эндпоинты для карточек товаров (card.wb.ru) и поиска (search.wb.ru).
-Библиотеки: aiogram (v3.x), httpx (асинхронные HTTP-запросы), aiosqlite (асинхронная SQLite), asyncio.
-Промпт для Cursor:
-"Создай структуру Telegram-бота на Python (aiogram v3) и FastAPI/HTTPX. Бот принимает артикул Wildberries, делает асинхронный GET-запрос к публичному API карточек WB (найди актуальный URL для получения цены и остатков по артикулу), парсит JSON-ответ и сохраняет артикул, цену и дату в базу данных SQLite через aiosqlite. Настрой Celery или apscheduler для ежедневной проверки сохраненных артикулов и отправки алертов в Telegram, если цена изменилась."
-Проект 2: AI-Аналитик отзывов (Sentiment Analysis)
-Закрывает требования: "AI-решения", "Системы отчетности".
-Функции: Бот принимает ссылку на товар, парсит последние 50 отзывов, отправляет их в LLM (YandexGPT или OpenAI) с промптом "Выяви топ-3 проблемы товара и топ-3 преимущества, верни результат в виде JSON".
-Ресурсы: Публичный API отзывов WB (feedbacks1.wildberries.ru), API YandexGPT (или OpenAI).
-Библиотеки: aiogram, httpx, yandex-cloud-ml-sdk (или openai), pydantic (для строгой валидации JSON, который возвращает нейросеть).
-Промпт для Cursor:
-"Напиши скрипт на Python, который асинхронно парсит отзывы с Wildberries по артикулу (используя их публичный endpoint для отзывов). Затем скрипт должен формировать промпт, передавать текст отзывов в YandexGPT API (или OpenAI) для анализа тональности и извлечения сущностей. Ответ от LLM должен строго валидироваться через Pydantic модель, чтобы гарантировать, что мы получаем структурированный JSON с полями 'pros' и 'cons'."
-Проект 3: Генератор PDF-отчетов для менеджеров
-Закрывает требования: "Автоматизация бизнес-процессов", "Аналитика".
-Функции: Скрипт читает CSV-файл с продажами (симуляция выгрузки из CRM), вычисляет маржинальность, строит график топ-10 товаров и генерирует PDF-отчет, который бот отправляет "директору" в Telegram.
-Ресурсы: Mock-данные (CSV), генерируемые скриптом.
-Библиотеки: pandas (анализ данных), matplotlib (графики), reportlab или fpdf2 (генерация PDF), aiogram.
-Промпт для Cursor:
-"Напиши backend-сервис на Python. Он должен читать CSV файл с mock-данными продаж через pandas, рассчитывать общую выручку и маржу, строить график с помощью matplotlib и сохранять его как изображение. Затем с помощью библиотеки reportlab создай PDF-отчет, вставив туда текст и картинку графика. В конце добавь функцию отправки этого PDF файла в Telegram через aiogram."
-Проект 4: Платежный шлюз для AI-подписки
-Закрывает требования: "Telegram-ботов с платежами".
-Функции: Бот предоставляет доступ к Проекту 2 (AI-аналитике) только после оплаты подписки через Telegram Stars или тестовый режим ЮKassa.
-Ресурсы: Telegram Bot Payments API.
-Библиотеки: aiogram (работа с PreCheckoutQuery и SuccessfulPayment).
-Промпт для Cursor:
-"Реализуй в aiogram v3 обработку платежей через Telegram Payments. Создай команду /subscribe, которая отправляет инвойс пользователю. Напиши обработчики для pre_checkout_query и successful_payment, которые после успешной оплаты обновляют статус пользователя в SQLite базе данных, давая ему доступ к AI-функциям бота."
-
-Проект 5: Telegram-бот "Quiz Bot" (викторина)
-Закрывает требования: "Telegram-боты с инлайн-клавиатурой", "Работа с внешними API".
-Функции: Бот загружает 10 вопросов с публичного бесплатного API OpenTDB, показывает их по одному с инлайн-кнопками (4 варианта ответа), ведёт счёт, сохраняет статистику и лидерборд в SQLite. Есть оффлайн-режим со встроенным пулом вопросов.
-Ресурсы: OpenTDB API (https://opentdb.com/api.php) — бесплатный, без ключа.
-Библиотеки: aiogram (v3.x, inline-клавиатуры и callback-запросы), httpx, aiosqlite, pydantic.
-Промпт для Cursor:
-"Создай Telegram-бота викторины на Python (aiogram v3). Бот загружает N вопросов с публичного API OpenTDB через httpx, показывает их по одному с инлайн-кнопками вариантов ответа, обрабатывает callback-запросы, ведёт счёт, сохраняет статистику игроков и топ-10 в SQLite через aiosqlite, валидирует модель вопроса через pydantic."
-
-Проект 6: Telegram-бот "Currency Rate Bot" (курсы валют ЦБ РФ)
-Закрывает требования: "Интеграции с официальными API", "Планировщик задач", "Аналитика".
-Функции: Бот получает официальный ежедневный XML ЦБ РФ с курсами валют, парсит его (xml.etree, stdlib), отвечает на запросы курсов и перевода в рубли, хранит историю курсов в SQLite и раз в день (10:00) рассылает подписчикам сводку курсов через apscheduler.
-Ресурсы: Официальный XML ЦБ РФ (http://www.cbr.ru/scripts/XML_daily.asp) — бесплатный, без ключа.
-Библиотеки: aiogram, httpx, apscheduler, aiosqlite, xml.etree (stdlib), pydantic.
-Промпт для Cursor:
-"Напиши Telegram-бота на Python (aiogram v3) с курсами валют. Бот асинхронно получает официальный XML ЦБ РФ через httpx, парсит его стандартным xml.etree.ElementTree (учитывая кодировку windows-1251 и десятичную запятую), отвечает на команды /rates, /rate, /convert, сохраняет историю курсов в SQLite через aiosqlite. Настрой apscheduler для ежедневной рассылки курсов подписчикам."
-
 ======================================================================
 ФАЙЛ: README.md
 ======================================================================
-# Learning Projects: 6 Telegram-ботов на Python
+# Learning Projects: 9 Telegram-ботов на Python
 
-По файлу `1.txt` (ТЗ) реализованы **6 учебных проектов**. Каждый проект —
+По файлу `1.txt` (ТЗ) реализованы **9 учебных проектов**. Каждый проект —
 **в отдельном репозитории**; этот репозиторий — индекс-портфолио
 (ТЗ, валидатор, сводный дамп кода).
 
@@ -107,20 +56,23 @@ Desktop.ini
 | 4 | [telegram-stars-payment-gateway](https://github.com/d3c0r1x/telegram-stars-payment-gateway) | Подписка на AI-функции через Telegram Stars / ЮKassa (тест) | aiogram (PreCheckoutQuery, SuccessfulPayment) + SQLite |
 | 5 | [telegram-quiz-bot](https://github.com/d3c0r1x/telegram-quiz-bot) | Викторина: вопросы OpenTDB, инлайн-кнопки, лидерборд в SQLite | aiogram v3, httpx, aiosqlite, pydantic |
 | 6 | [currency-rate-bot](https://github.com/d3c0r1x/currency-rate-bot) | Курсы валют ЦБ РФ: XML-парсинг, конвертация, история, ежедневная рассылка | aiogram v3, httpx, apscheduler, aiosqlite, xml.etree |
+| 7 | [telegram-weather-bot](https://github.com/d3c0r1x/telegram-weather-bot) | Погода и прогноз на 7 дней через Open-Meteo, ежедневная рассылка | aiogram v3, httpx, pydantic, apscheduler, aiosqlite |
+| 8 | [telegram-expense-tracker](https://github.com/d3c0r1x/telegram-expense-tracker) | Учёт расходов: /add с автокатегоризацией, отчёты, экспорт CSV | aiogram v3, aiosqlite, stdlib csv |
+| 9 | [telegram-news-bot](https://github.com/d3c0r1x/telegram-news-bot) | RSS/Atom ленты: дедупликация, ежедневный дайджест подписчикам | aiogram v3, httpx, aiosqlite, xml.etree, apscheduler |
 
 ## Что внутри этого репозитория
 
-- `1.txt` — техническое задание на все 6 проектов (библиотеки и методы);
+- `1.txt` — техническое задание на все 9 проектов (библиотеки и методы);
 - `_validate.py` — валидатор: прогоняет каждый проект изолированно
-  (`.venv/Scripts/python _validate.py p1|p2|...|p6`);
+  (`.venv/Scripts/python _validate.py p1|p2|...|p9`);
 - `ves_kod_proektov.txt` — сводный дамп кода всех проектов;
-- папки `project1_...`–`project6_...` — рабочие копии, каждая со своим
+- папки `project1_...`–`project9_...` — рабочие копии, каждая со своим
   git-репозиторием, запушенным на GitHub.
 
 ## Продвинутый уровень (v2)
 
-Все 6 проектов обновлены до «продвинутого учебного» уровня — без новых
-сторонних зависимостей, только на библиотеках из ТЗ:
+Все 9 проектов — «продвинутые учебные», без лишних сторонних зависимостей,
+только на библиотеках из ТЗ:
 
 - **aiogram v3 middlewares** во всех ботах: троттлинг (спам-защита) и логирование;
 - **TTL-кэши и retry с джиттером** на чистом stdlib (`utils.py`);
@@ -130,9 +82,13 @@ Desktop.ini
 - **тарифы, пробный период и возвраты Stars** (P4);
 - **выбор сложности, пагинация лидерборда, точность в %** (P5);
 - **watchlist и пороговые алерты курсов** с часовым джобом (P6);
+- **namespace-агностичный парсер RSS/Atom** и дедупликация по `UNIQUE(link)` (P9);
+- **агрегаты в SQL** (GROUP BY/BETWEEN) и CSV с BOM для Excel (P8);
+- **чистые функции парсинга Open-Meteo** под unit-тесты (P7);
 - **операции**: `pyproject.toml`, `Dockerfile`, GitHub Actions CI в каждом репо.
 
-Итого **41 unit-тест** (9+7+7+5+7+8) + изолированный валидатор `_validate.py`.
+Итого **64 unit-теста** (9+7+7+5+7+8+7+8+6) + изолированный валидатор
+`_validate.py`.
 
 ## Связка проектов
 
@@ -140,7 +96,7 @@ Desktop.ini
   (`card.wb.ru`), который Проект 2 использует для получения `root_id` отзывов.
 - **4 → 2**: Проект 4 открывает доступ к AI-анализу Проекта 2 после оплаты
   подписки (`ai_service.py` импортирует модули Проекта 2, если папка рядом).
-- **5, 6**: независимые боты на бесплатных публичных API без ключей —
+- **5, 6, 7, 8, 9**: независимые боты на бесплатных публичных API без ключей —
   запускаются сразу после установки зависимостей.
 
 ## Запуск
@@ -148,8 +104,8 @@ Desktop.ini
 Каждый проект независим и запускается из своей папки:
 
 ```bash
-cd project5_telegram_quiz_bot && pip install -r requirements.txt && python bot.py
-# ...аналогично для project1/2/3/4/6
+cd project7_telegram_weather_bot && pip install -r requirements.txt && python bot.py
+# ...аналогично для project1/2/3/4/5/6/8/9
 ```
 
 Нужен только токен бота от @BotFather — переменные окружения описаны
@@ -169,13 +125,16 @@ cd project5_telegram_quiz_bot && pip install -r requirements.txt && python bot.p
 3. **ЦБ РФ** (Проект 6) — официальный бесплатный XML без ключа; нюансы:
    кодировка windows-1251 (парсим байты), десятичная запятая, `Nominal`
    для «дорогих» валют.
-
+4. **Open-Meteo** (Проект 7) — бесплатный API без ключа; бот кэширует
+   прогноз (TTL 30 мин) и имеет оффлайн-демо.
+5. **RSS/Atom ленты** (Проект 9) — публичные и бесплатные; парсер
+   устойчив к namespace, кодировкам и «грязным» лентам.
 
 ======================================================================
 ФАЙЛ: _validate.py
 ======================================================================
 """Валидация проектов. Запускать ПО ОДНОМУ ПРОЕКТУ на процесс:
-    .venv/Scripts/python _validate.py p1|p2|p3|p4
+    .venv/Scripts/python _validate.py p1|p2|...|p9
 
 Каждый проект проверяется изолированно (как при реальном запуске), поэтому
 коллизии одноимённых модулей (config.py, db.py) исключены.
@@ -194,6 +153,9 @@ PROJECTS = {
     "p4": "project4_payment_gateway",
     "p5": "project5_telegram_quiz_bot",
     "p6": "project6_currency_rate_bot",
+    "p7": "project7_telegram_weather_bot",
+    "p8": "project8_telegram_expense_tracker",
+    "p9": "project9_telegram_news_bot",
 }
 
 
@@ -355,6 +317,117 @@ def validate_p6() -> None:
     print("  [OK] парсинг XML ЦБ (байты/кодировка) + демо-курсы + история + подписка")
 
 
+def validate_p7() -> None:
+    """Погодный бот: демо-погода, парсеры Open-Meteo, города и рассылка."""
+    _insert("p7")
+    from db import Database
+    from weather_api import Geocoder, WeatherClient, _parse_current, _parse_forecast
+
+    payload = {
+        "current": {
+            "time": "2026-08-07T12:00", "temperature_2m": 21.5,
+            "wind_speed_10m": 4.2, "relative_humidity_2m": 61, "weather_code": 2,
+        },
+        "daily": {
+            "time": ["2026-08-07", "2026-08-08"],
+            "weather_code": [2, 61],
+            "temperature_2m_max": [24.0, 20.0],
+            "temperature_2m_min": [15.0, 13.0],
+            "precipitation_probability_max": [10, 80],
+        },
+    }
+    cur = _parse_current(payload)
+    assert cur.temperature == 21.5 and cur.code == 2
+    days = _parse_forecast(payload)
+    assert len(days) == 2 and days[1].precip_prob == 80.0
+
+    async def run() -> None:
+        geo = Geocoder(demo_mode=True)
+        point = await geo.geocode("Москва")
+        assert point is not None and point.latitude != 0
+        wc = WeatherClient(demo_mode=True)
+        cur_w = await wc.current(55.75, 37.62)
+        assert cur_w.describe()
+        fc = await wc.forecast(55.75, 37.62, days=7)
+        assert len(fc) == 7
+        db = Database(os.path.join(tempfile.gettempdir(), "smoke_weather.db"))
+        if os.path.exists(db.path):
+            os.remove(db.path)
+        await db.init()
+        await db.set_city(1, "alice", "Москва", 55.75, 37.62)
+        await db.set_digest(1, "alice", True)
+        users = await db.digest_users()
+        assert users and users[0]["city"] == "Москва"
+
+    asyncio.run(run())
+    print("  [OK] demo-weather + Open-Meteo parsers + city + digest subscription")
+
+
+def validate_p8() -> None:
+    """Трекер расходов: парсинг /add, категории, агрегаты, экспорт CSV."""
+    _insert("p8")
+    from categories import parse_expense
+    from db import Database
+
+    parsed = parse_expense("500 кофе")
+    assert parsed is not None and parsed[0] == 500.0 and parsed[2] == "Продукты"
+    assert parse_expense("abc") is None
+    assert parse_expense("0 ничего") is None
+
+    async def run() -> None:
+        db = Database(os.path.join(tempfile.gettempdir(), "smoke_expenses.db"))
+        if os.path.exists(db.path):
+            os.remove(db.path)
+        await db.init()
+        for amount, note in [(500, "кофе"), (300, "метро"), (200, "обед")]:
+            await db.add_expense(1, float(amount), "Продукты" if note != "метро" else "Транспорт", note)
+        from datetime import date
+        today = date.today()
+        assert await db.total_between(1, today, today) == 1000.0
+        by_cat = await db.by_category(1, today, today)
+        assert by_cat["Продукты"] == 700.0 and by_cat["Транспорт"] == 300.0
+        assert len(await db.recent(1, limit=2)) == 2
+        csv_path = os.path.join(tempfile.gettempdir(), "smoke_export.csv")
+        count = await db.export_csv(csv_path, 1, today, today)
+        assert count == 3 and os.path.getsize(csv_path) > 0
+
+    asyncio.run(run())
+    print("  [OK] auto-categorization + SQL aggregates by date + CSV export")
+
+
+def validate_p9() -> None:
+    """Новостной бот: RSS/Atom парсинг, дедупликация, подписки на дайджест."""
+    _insert("p9")
+    from db import Database
+    from rss_parser import NewsItem, demo_feed, parse_feed
+
+    rss = ("<?xml version='1.0' encoding='UTF-8'?>"
+           "<rss version='2.0'><channel><title>Test</title>"
+           "<item><title>Новость 1</title><link>https://x.test/1</link></item>"
+           "<item><title>Новость 2</title><link>https://x.test/2</link></item>"
+           "</channel></rss>").encode("utf-8")
+    items = parse_feed(rss, source="Test")
+    assert len(items) == 2 and items[0].title == "Новость 1"
+    demo = demo_feed("Демо", amount=3)
+    assert len(demo) == 3 and all(i.title for i in demo)
+
+    async def run() -> None:
+        db = Database(os.path.join(tempfile.gettempdir(), "smoke_news.db"))
+        if os.path.exists(db.path):
+            os.remove(db.path)
+        await db.init()
+        batch = [NewsItem(title="A", link="https://x/1"), NewsItem(title="B", link="https://x/2")]
+        assert len(await db.save_articles(batch)) == 2
+        assert await db.save_articles(batch) == []  # dedup
+        assert await db.total_articles() == 2
+        assert await db.subscribe(1, "https://feed.test/rss", "Test") is True
+        assert await db.subscribe(1, "https://feed.test/rss", "Test") is False
+        assert len(await db.all_subscriptions()) == 1
+
+    asyncio.run(run())
+    print("  [OK] RSS parsing + demo feed + dedup (UNIQUE link) + subscriptions")
+
+
 def main() -> None:
     target = sys.argv[1] if len(sys.argv) > 1 else "all"
     checks = {
@@ -364,6 +437,9 @@ def main() -> None:
         "p4": validate_p4,
         "p5": validate_p5,
         "p6": validate_p6,
+        "p7": validate_p7,
+        "p8": validate_p8,
+        "p9": validate_p9,
     }
     to_run = list(checks) if target == "all" else [target]
     for key in to_run:
@@ -374,7 +450,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\.dockerignore
@@ -387,7 +462,6 @@ __pycache__/
 .venv/
 tests/
 .git/
-
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\.env.example
@@ -420,34 +494,6 @@ WB_ADMIN_IDS=
 # TTL кэша карточек WB (секунды)
 WB_CACHE_TTL_SECONDS=300
 
-
-======================================================================
-ФАЙЛ: project1_wb_price_tracker\.github\workflows\ci.yml
-======================================================================
-name: CI
-
-on:
-  push:
-  pull_request:
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt pytest
-      - name: Compile check
-        run: python -m compileall .
-      - name: Run tests
-        run: python -m pytest tests/ -q
-
-
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\.gitignore
 ======================================================================
@@ -470,7 +516,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 
-
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\Dockerfile
 ======================================================================
@@ -487,7 +532,6 @@ COPY . .
 # Токен и режим задаются при запуске:
 #   docker run -e WB_BOT_TOKEN=... -e WB_DEMO_MODE=1 ...
 CMD ["python", "bot.py"]
-
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\README.md
@@ -588,7 +632,6 @@ python bot.py
 
 Запуск из корня с прокси: `WB_PROXY=socks5://127.0.0.1:1080 WB_DEMO_MODE=0 python bot.py`.
 
-
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\alerts.py
 ======================================================================
@@ -639,7 +682,6 @@ def should_notify(
         except ValueError:
             pass  # битая дата — не мешаем уведомлению
     return True, messages
-
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\bot.py
@@ -966,7 +1008,6 @@ async def _scheduled_cleanup() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
-
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\config.py
 ======================================================================
@@ -1009,7 +1050,6 @@ THROTTLE_MIN_INTERVAL = float(os.getenv("WB_THROTTLE_MIN_INTERVAL", "0.7"))
 ADMIN_IDS = [int(x) for x in os.getenv("WB_ADMIN_IDS", "").split(",") if x.strip().isdigit()]
 # TTL кэша карточек WB (секунды): повторный /track того же артикула мгновенный
 CACHE_TTL_SECONDS = float(os.getenv("WB_CACHE_TTL_SECONDS", "300"))
-
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\db.py
@@ -1226,7 +1266,6 @@ class Database:
                 users = (await cur.fetchone())[0]
         return {"items": items, "tracked": tracked, "history": history, "users": users}
 
-
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\middlewares.py
 ======================================================================
@@ -1304,7 +1343,6 @@ class LoggingMiddleware(BaseMiddleware):
         )
         return result
 
-
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\pyproject.toml
 ======================================================================
@@ -1318,7 +1356,6 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 addopts = "-q"
 
-
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\requirements.txt
 ======================================================================
@@ -1327,7 +1364,6 @@ httpx>=0.27
 curl_cffi>=0.16   # антибот-обход: имитация TLS/HTTP2-отпечатка Chrome (см. README)
 aiosqlite>=0.20
 apscheduler>=3.10,<4
-
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\run_bot1.cmd
@@ -1356,7 +1392,6 @@ rem 3) restart this script. Check access with the /diag command in Telegram.
 
 ..\.venv\Scripts\python.exe -u bot.py
 
-
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\tests\conftest.py
 ======================================================================
@@ -1365,7 +1400,6 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\tests\test_smoke.py
@@ -1581,7 +1615,6 @@ def test_cleanup_history(tmp_path) -> None:
 
     asyncio.run(run())
 
-
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\utils.py
 ======================================================================
@@ -1689,7 +1722,6 @@ def async_retry(
         return wrapper
 
     return decorator
-
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\wb_api.py
@@ -2001,7 +2033,6 @@ class MockWBClient:
     async def aclose(self) -> None:
         return None
 
-
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\.dockerignore
 ======================================================================
@@ -2013,7 +2044,6 @@ __pycache__/
 .venv/
 tests/
 .git/
-
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\.env.example
@@ -2047,34 +2077,6 @@ ANALYSIS_CACHE_TTL=300
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL=0.7
 
-
-======================================================================
-ФАЙЛ: project2_ai_review_analyst\.github\workflows\ci.yml
-======================================================================
-name: CI
-
-on:
-  push:
-  pull_request:
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt pytest
-      - name: Compile check
-        run: python -m compileall .
-      - name: Run tests
-        run: python -m pytest tests/ -q
-
-
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\.gitignore
 ======================================================================
@@ -2097,7 +2099,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 
-
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\Dockerfile
 ======================================================================
@@ -2111,7 +2112,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 CMD ["python", "bot.py"]
-
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\README.md
@@ -2185,7 +2185,6 @@ python bot.py
 - `root_id` для отзывов берётся из карточки товара (`card.wb.ru`, см. Проект 1).
 - Официальный API отзывов `feedbacks-api.wildberries.ru` требует токен продавца —
   по ТЗ не используется.
-
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\bot.py
@@ -2408,7 +2407,6 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
-
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\config.py
 ======================================================================
@@ -2447,7 +2445,6 @@ LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
 ANALYSIS_CACHE_TTL = float(os.getenv("ANALYSIS_CACHE_TTL", "300"))
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
-
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\llm.py
@@ -2705,7 +2702,6 @@ async def analyze_with_retry(
             )
     raise RuntimeError("LLM не вернул валидный JSON после всех попыток") from last
 
-
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\middlewares.py
 ======================================================================
@@ -2773,7 +2769,6 @@ class LoggingMiddleware(BaseMiddleware):
         )
         return result
 
-
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\models.py
 ======================================================================
@@ -2810,7 +2805,6 @@ class AnalysisResult(BaseModel):
     )
     summary: str = Field(default="", description="Короткое резюме анализа")
 
-
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\pyproject.toml
 ======================================================================
@@ -2824,7 +2818,6 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 addopts = "-q"
 
-
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\requirements.txt
 ======================================================================
@@ -2837,7 +2830,6 @@ openai>=1.30
 
 # Для LLM_PROVIDER=yandex (тяжёлая, ставится отдельно при необходимости):
 # yandex-cloud-ml-sdk
-
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\reviews.py
@@ -2991,7 +2983,6 @@ def mock_reviews(n: int = config.MAX_REVIEWS) -> list[dict]:
         reviews.append({"text": text, "productValuation": rating})
     return reviews
 
-
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\tests\conftest.py
 ======================================================================
@@ -3000,7 +2991,6 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\tests\test_smoke.py
@@ -3127,7 +3117,6 @@ def test_reviews_cache_ttl() -> None:
 
     asyncio.run(run())
 
-
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\utils.py
 ======================================================================
@@ -3214,7 +3203,6 @@ def async_retry(
 
     return decorator
 
-
 ======================================================================
 ФАЙЛ: project3_pdf_reports\.dockerignore
 ======================================================================
@@ -3230,7 +3218,6 @@ __pycache__/
 tests/
 .git/
 
-
 ======================================================================
 ФАЙЛ: project3_pdf_reports\.env.example
 ======================================================================
@@ -3242,34 +3229,6 @@ WB_BOT_TOKEN=123456:ABC-DEF...
 THROTTLE_MIN_INTERVAL=0.7
 
 # CLI (без бота): python report.py --input sales.csv --output report.pdf --chart top10.png
-
-
-======================================================================
-ФАЙЛ: project3_pdf_reports\.github\workflows\ci.yml
-======================================================================
-name: CI
-
-on:
-  push:
-  pull_request:
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt pytest
-      - name: Compile check
-        run: python -m compileall .
-      - name: Run tests
-        run: python -m pytest tests/ -q
-
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\.gitignore
@@ -3298,7 +3257,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 
-
 ======================================================================
 ФАЙЛ: project3_pdf_reports\Dockerfile
 ======================================================================
@@ -3317,7 +3275,6 @@ COPY . .
 
 # CLI без бота: docker run --rm -v $(pwd):/app python report.py --input /app/sales.csv
 CMD ["python", "bot.py"]
-
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\README.md
@@ -3379,7 +3336,6 @@ python bot.py             # команда /report — сгенерироват�
 
 Тесты: `pytest tests/ -q` (7 тестов: агрегация с разрезом по дням/категориям,
 PDF и PNG, CLI, генератор данных).
-
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\bot.py
@@ -3514,7 +3470,6 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
-
 ======================================================================
 ФАЙЛ: project3_pdf_reports\config.py
 ======================================================================
@@ -3526,7 +3481,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BOT_TOKEN = os.getenv("WB_BOT_TOKEN", "")
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
-
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\generate_mock_data.py
@@ -3590,7 +3544,6 @@ def main(csv_path: str = CSV_PATH) -> None:
 
 if __name__ == "__main__":
     main()
-
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\middlewares.py
@@ -3656,7 +3609,6 @@ class LoggingMiddleware(BaseMiddleware):
         logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
         return result
 
-
 ======================================================================
 ФАЙЛ: project3_pdf_reports\pyproject.toml
 ======================================================================
@@ -3669,7 +3621,6 @@ requires-python = ">=3.11"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
-
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\report.py
@@ -3930,7 +3881,6 @@ if __name__ == "__main__":
         f"({report.margin_percent:.1f}%)"
     )
 
-
 ======================================================================
 ФАЙЛ: project3_pdf_reports\requirements.txt
 ======================================================================
@@ -3939,413 +3889,6 @@ pandas>=2.2
 matplotlib>=3.8
 reportlab>=4.1
 
-
-======================================================================
-ФАЙЛ: project3_pdf_reports\sales.csv
-======================================================================
-﻿date;product_name;units;revenue;cost
-2026-08-02;Микрофон Studio;2;10980;7200
-2026-07-05;Клавиатура Mech;5;22450;14500
-2026-07-23;Портативная колонка BoomBox;3;11970;6900
-2026-05-28;Микрофон Studio;12;65880;43200
-2026-06-12;Наушники AirSound Pro;10;59900;38000
-2026-07-25;Смартфон Nova X;1;18990;14200
-2026-06-02;Портативная колонка BoomBox;4;15960;9200
-2026-05-26;Веб-камера HD;1;3490;2100
-2026-05-14;Портативная колонка BoomBox;12;47880;27600
-2026-06-13;Клавиатура Mech;9;40410;26100
-2026-05-22;Портативная колонка BoomBox;8;31920;18400
-2026-08-05;Фитнес-браслет Pulse;13;38870;22100
-2026-07-16;Мышь Ergo;13;32370;19500
-2026-06-23;Клавиатура Mech;7;31430;20300
-2026-07-09;Фитнес-браслет Pulse;3;8970;5100
-2026-07-23;Мышь Ergo;6;14940;9000
-2026-07-24;Наушники AirSound Pro;7;41930;26600
-2026-06-22;Зарядное устройство 65W;14;26460;12600
-2026-07-31;Веб-камера HD;5;17450;10500
-2026-05-29;Клавиатура Mech;8;35920;23200
-2026-06-18;Наушники AirSound Pro;15;89850;57000
-2026-06-29;Наушники AirSound Pro;9;53910;34200
-2026-05-18;"Монитор 27""";11;175890;129800
-2026-06-20;Ноутбук-станция;14;699860;539000
-2026-05-07;Веб-камера HD;4;13960;8400
-2026-05-13;Наушники AirSound Pro;1;5990;3800
-2026-06-29;Портативная колонка BoomBox;13;51870;29900
-2026-07-07;Наушники AirSound Pro;14;83860;53200
-2026-06-18;"Монитор 27""";2;31980;23600
-2026-05-16;Фитнес-браслет Pulse;8;23920;13600
-2026-07-16;"Монитор 27""";6;95940;70800
-2026-07-10;Зарядное устройство 65W;6;11340;5400
-2026-05-08;Микрофон Studio;5;27450;18000
-2026-05-15;Ноутбук-станция;11;549890;423500
-2026-05-16;Наушники AirSound Pro;10;59900;38000
-2026-07-05;Умные часы FitTrack;9;67410;46800
-2026-06-18;Умные часы FitTrack;8;59920;41600
-2026-05-16;Фитнес-браслет Pulse;15;44850;25500
-2026-07-08;Клавиатура Mech;9;40410;26100
-2026-07-29;Микрофон Studio;6;32940;21600
-2026-08-01;Портативная колонка BoomBox;14;55860;32200
-2026-06-15;Мышь Ergo;6;14940;9000
-2026-07-09;Фитнес-браслет Pulse;2;5980;3400
-2026-06-26;Ноутбук-станция;10;499900;385000
-2026-06-03;Портативная колонка BoomBox;11;43890;25300
-2026-05-15;Кабель USB-C 2м;15;8850;3150
-2026-07-03;Чехол для телефона;3;2670;1140
-2026-05-26;Умные часы FitTrack;4;29960;20800
-2026-05-23;Внешний SSD 1TB;5;44950;30500
-2026-05-23;Кабель USB-C 2м;15;8850;3150
-2026-07-08;Кабель USB-C 2м;6;3540;1260
-2026-06-03;Умные часы FitTrack;9;67410;46800
-2026-07-30;Наушники AirSound Pro;13;77870;49400
-2026-07-17;"Монитор 27""";2;31980;23600
-2026-05-10;Микрофон Studio;3;16470;10800
-2026-07-28;Кабель USB-C 2м;10;5900;2100
-2026-05-21;Кабель USB-C 2м;7;4130;1470
-2026-07-04;Чехол для телефона;9;8010;3420
-2026-08-04;Внешний SSD 1TB;14;125860;85400
-2026-07-22;Микрофон Studio;12;65880;43200
-2026-05-29;Микрофон Studio;15;82350;54000
-2026-05-15;Мышь Ergo;5;12450;7500
-2026-06-29;Зарядное устройство 65W;2;3780;1800
-2026-06-08;Кабель USB-C 2м;3;1770;630
-2026-07-03;Смартфон Nova X;12;227880;170400
-2026-07-14;Внешний SSD 1TB;13;116870;79300
-2026-07-23;Внешний SSD 1TB;15;134850;91500
-2026-06-28;"Монитор 27""";11;175890;129800
-2026-06-02;"Монитор 27""";11;175890;129800
-2026-07-17;Веб-камера HD;4;13960;8400
-2026-07-16;Зарядное устройство 65W;13;24570;11700
-2026-05-30;Внешний SSD 1TB;13;116870;79300
-2026-05-21;Ноутбук-станция;1;49990;38500
-2026-08-03;Зарядное устройство 65W;8;15120;7200
-2026-06-20;Наушники AirSound Pro;15;89850;57000
-2026-06-27;Ноутбук-станция;14;699860;539000
-2026-07-06;Портативная колонка BoomBox;1;3990;2300
-2026-07-26;Ноутбук-станция;10;499900;385000
-2026-06-04;Наушники AirSound Pro;12;71880;45600
-2026-05-29;"Монитор 27""";2;31980;23600
-2026-07-20;Мышь Ergo;3;7470;4500
-2026-05-27;Микрофон Studio;8;43920;28800
-2026-05-30;Умные часы FitTrack;5;37450;26000
-2026-06-12;"Монитор 27""";10;159900;118000
-2026-05-28;Портативная колонка BoomBox;15;59850;34500
-2026-05-09;Мышь Ergo;12;29880;18000
-2026-06-27;Портативная колонка BoomBox;12;47880;27600
-2026-05-14;Кабель USB-C 2м;11;6490;2310
-2026-05-31;Зарядное устройство 65W;8;15120;7200
-2026-07-05;Чехол для телефона;2;1780;760
-2026-06-23;Портативная колонка BoomBox;2;7980;4600
-2026-05-27;Смартфон Nova X;10;189900;142000
-2026-07-08;Портативная колонка BoomBox;10;39900;23000
-2026-05-07;Смартфон Nova X;2;37980;28400
-2026-07-07;Микрофон Studio;1;5490;3600
-2026-08-01;Наушники AirSound Pro;15;89850;57000
-2026-07-27;"Монитор 27""";6;95940;70800
-2026-07-01;Внешний SSD 1TB;4;35960;24400
-2026-07-09;Микрофон Studio;8;43920;28800
-2026-05-24;Внешний SSD 1TB;3;26970;18300
-2026-07-05;Веб-камера HD;8;27920;16800
-2026-06-14;Мышь Ergo;8;19920;12000
-2026-07-24;Портативная колонка BoomBox;2;7980;4600
-2026-06-21;Микрофон Studio;7;38430;25200
-2026-06-07;Кабель USB-C 2м;7;4130;1470
-2026-07-30;"Монитор 27""";12;191880;141600
-2026-05-15;Микрофон Studio;11;60390;39600
-2026-06-15;Наушники AirSound Pro;1;5990;3800
-2026-07-23;Клавиатура Mech;6;26940;17400
-2026-07-12;Портативная колонка BoomBox;4;15960;9200
-2026-07-19;Внешний SSD 1TB;8;71920;48800
-2026-07-01;Кабель USB-C 2м;3;1770;630
-2026-07-27;Чехол для телефона;4;3560;1520
-2026-05-27;Чехол для телефона;13;11570;4940
-2026-05-14;Наушники AirSound Pro;1;5990;3800
-2026-08-04;Внешний SSD 1TB;14;125860;85400
-2026-07-06;Наушники AirSound Pro;15;89850;57000
-2026-06-04;Умные часы FitTrack;7;52430;36400
-2026-06-15;Чехол для телефона;4;3560;1520
-2026-07-15;Ноутбук-станция;1;49990;38500
-2026-06-17;Кабель USB-C 2м;1;590;210
-2026-06-08;Фитнес-браслет Pulse;15;44850;25500
-2026-05-08;Фитнес-браслет Pulse;7;20930;11900
-2026-05-26;Клавиатура Mech;13;58370;37700
-2026-06-04;Микрофон Studio;12;65880;43200
-2026-06-29;Умные часы FitTrack;4;29960;20800
-2026-05-23;Портативная колонка BoomBox;1;3990;2300
-2026-07-29;Клавиатура Mech;9;40410;26100
-2026-07-29;Клавиатура Mech;6;26940;17400
-2026-06-05;Смартфон Nova X;10;189900;142000
-2026-05-30;Внешний SSD 1TB;15;134850;91500
-2026-06-01;Умные часы FitTrack;1;7490;5200
-2026-07-13;Наушники AirSound Pro;14;83860;53200
-2026-07-28;Наушники AirSound Pro;10;59900;38000
-2026-07-06;Микрофон Studio;14;76860;50400
-2026-05-25;Кабель USB-C 2м;2;1180;420
-2026-05-21;Портативная колонка BoomBox;10;39900;23000
-2026-07-26;Смартфон Nova X;10;189900;142000
-2026-05-23;Кабель USB-C 2м;11;6490;2310
-2026-06-26;Веб-камера HD;9;31410;18900
-2026-07-10;Ноутбук-станция;5;249950;192500
-2026-06-26;Микрофон Studio;12;65880;43200
-2026-06-16;Портативная колонка BoomBox;5;19950;11500
-2026-05-15;Умные часы FitTrack;11;82390;57200
-2026-06-26;Фитнес-браслет Pulse;8;23920;13600
-2026-07-27;Ноутбук-станция;13;649870;500500
-2026-05-18;Смартфон Nova X;8;151920;113600
-2026-07-27;Веб-камера HD;2;6980;4200
-2026-06-02;Внешний SSD 1TB;4;35960;24400
-2026-06-22;Фитнес-браслет Pulse;3;8970;5100
-2026-07-05;Ноутбук-станция;2;99980;77000
-2026-07-16;Зарядное устройство 65W;5;9450;4500
-2026-05-28;Чехол для телефона;14;12460;5320
-2026-05-19;Клавиатура Mech;5;22450;14500
-2026-05-30;Мышь Ergo;11;27390;16500
-2026-05-27;Смартфон Nova X;11;208890;156200
-2026-05-13;Фитнес-браслет Pulse;15;44850;25500
-2026-07-19;Наушники AirSound Pro;15;89850;57000
-2026-07-23;Фитнес-браслет Pulse;2;5980;3400
-2026-07-17;Клавиатура Mech;9;40410;26100
-2026-05-20;Фитнес-браслет Pulse;5;14950;8500
-2026-06-23;Портативная колонка BoomBox;12;47880;27600
-2026-05-16;Портативная колонка BoomBox;11;43890;25300
-2026-06-02;"Монитор 27""";5;79950;59000
-2026-07-30;Чехол для телефона;5;4450;1900
-2026-06-12;Наушники AirSound Pro;11;65890;41800
-2026-07-31;"Монитор 27""";5;79950;59000
-2026-07-20;Смартфон Nova X;6;113940;85200
-2026-07-16;Микрофон Studio;5;27450;18000
-2026-05-27;Клавиатура Mech;8;35920;23200
-2026-05-26;Клавиатура Mech;7;31430;20300
-2026-07-27;Смартфон Nova X;2;37980;28400
-2026-07-17;Ноутбук-станция;12;599880;462000
-2026-06-19;Внешний SSD 1TB;1;8990;6100
-2026-07-18;Веб-камера HD;9;31410;18900
-2026-07-31;Кабель USB-C 2м;3;1770;630
-2026-07-31;Фитнес-браслет Pulse;6;17940;10200
-2026-07-10;Ноутбук-станция;6;299940;231000
-2026-05-12;Микрофон Studio;4;21960;14400
-2026-05-26;Наушники AirSound Pro;6;35940;22800
-2026-06-14;Ноутбук-станция;14;699860;539000
-2026-07-17;Веб-камера HD;12;41880;25200
-2026-07-06;Ноутбук-станция;15;749850;577500
-2026-07-14;"Монитор 27""";3;47970;35400
-2026-08-02;Ноутбук-станция;7;349930;269500
-2026-06-24;Умные часы FitTrack;12;89880;62400
-2026-06-14;Мышь Ergo;15;37350;22500
-2026-07-05;Мышь Ergo;11;27390;16500
-2026-05-08;Фитнес-браслет Pulse;3;8970;5100
-2026-08-01;Наушники AirSound Pro;7;41930;26600
-2026-07-08;"Монитор 27""";8;127920;94400
-2026-06-08;Портативная колонка BoomBox;14;55860;32200
-2026-07-07;Зарядное устройство 65W;5;9450;4500
-2026-05-13;Портативная колонка BoomBox;1;3990;2300
-2026-06-24;Портативная колонка BoomBox;7;27930;16100
-2026-07-28;Фитнес-браслет Pulse;14;41860;23800
-2026-06-22;Мышь Ergo;5;12450;7500
-2026-06-15;Микрофон Studio;9;49410;32400
-2026-05-29;Микрофон Studio;14;76860;50400
-2026-07-22;Зарядное устройство 65W;1;1890;900
-2026-07-14;Ноутбук-станция;5;249950;192500
-2026-08-01;Веб-камера HD;5;17450;10500
-2026-06-11;Наушники AirSound Pro;10;59900;38000
-2026-06-26;Зарядное устройство 65W;12;22680;10800
-2026-06-01;Кабель USB-C 2м;10;5900;2100
-2026-05-24;Наушники AirSound Pro;7;41930;26600
-2026-07-31;Портативная колонка BoomBox;5;19950;11500
-2026-08-05;Клавиатура Mech;7;31430;20300
-2026-05-29;Внешний SSD 1TB;15;134850;91500
-2026-05-12;Микрофон Studio;12;65880;43200
-2026-06-11;Портативная колонка BoomBox;6;23940;13800
-2026-06-24;Наушники AirSound Pro;11;65890;41800
-2026-05-13;Веб-камера HD;6;20940;12600
-2026-06-28;"Монитор 27""";2;31980;23600
-2026-05-12;Внешний SSD 1TB;5;44950;30500
-2026-06-15;Кабель USB-C 2м;6;3540;1260
-2026-05-27;Клавиатура Mech;5;22450;14500
-2026-06-13;Умные часы FitTrack;4;29960;20800
-2026-05-11;Микрофон Studio;7;38430;25200
-2026-07-14;Клавиатура Mech;15;67350;43500
-2026-06-28;Веб-камера HD;10;34900;21000
-2026-08-05;Кабель USB-C 2м;9;5310;1890
-2026-07-10;Фитнес-браслет Pulse;5;14950;8500
-2026-05-23;Кабель USB-C 2м;13;7670;2730
-2026-06-25;Веб-камера HD;11;38390;23100
-2026-06-10;Чехол для телефона;8;7120;3040
-2026-06-01;Микрофон Studio;4;21960;14400
-2026-07-15;Чехол для телефона;13;11570;4940
-2026-06-30;Микрофон Studio;2;10980;7200
-2026-05-16;Внешний SSD 1TB;11;98890;67100
-2026-07-25;Веб-камера HD;6;20940;12600
-2026-07-06;"Монитор 27""";13;207870;153400
-2026-07-08;Микрофон Studio;5;27450;18000
-2026-07-18;Мышь Ergo;4;9960;6000
-2026-07-05;Смартфон Nova X;1;18990;14200
-2026-07-27;Чехол для телефона;10;8900;3800
-2026-05-17;Чехол для телефона;7;6230;2660
-2026-05-08;Веб-камера HD;4;13960;8400
-2026-06-15;Кабель USB-C 2м;8;4720;1680
-2026-05-14;Портативная колонка BoomBox;3;11970;6900
-2026-07-23;Клавиатура Mech;1;4490;2900
-2026-07-08;Мышь Ergo;7;17430;10500
-2026-05-08;Умные часы FitTrack;13;97370;67600
-2026-07-30;Внешний SSD 1TB;8;71920;48800
-2026-07-21;Внешний SSD 1TB;4;35960;24400
-2026-06-07;Чехол для телефона;3;2670;1140
-2026-05-26;Микрофон Studio;9;49410;32400
-2026-06-10;Веб-камера HD;6;20940;12600
-2026-06-02;Веб-камера HD;14;48860;29400
-2026-05-27;Кабель USB-C 2м;14;8260;2940
-2026-07-16;Чехол для телефона;15;13350;5700
-2026-06-06;Клавиатура Mech;14;62860;40600
-2026-07-05;Чехол для телефона;5;4450;1900
-2026-07-01;"Монитор 27""";11;175890;129800
-2026-05-31;Мышь Ergo;13;32370;19500
-2026-07-06;Чехол для телефона;11;9790;4180
-2026-07-27;Фитнес-браслет Pulse;8;23920;13600
-2026-07-06;Клавиатура Mech;5;22450;14500
-2026-06-26;Фитнес-браслет Pulse;6;17940;10200
-2026-07-26;Ноутбук-станция;9;449910;346500
-2026-07-07;Умные часы FitTrack;3;22470;15600
-2026-07-17;Кабель USB-C 2м;12;7080;2520
-2026-07-28;Клавиатура Mech;4;17960;11600
-2026-06-24;Кабель USB-C 2м;7;4130;1470
-2026-06-13;Внешний SSD 1TB;8;71920;48800
-2026-06-13;Смартфон Nova X;4;75960;56800
-2026-05-23;Кабель USB-C 2м;15;8850;3150
-2026-05-24;Клавиатура Mech;1;4490;2900
-2026-08-05;Кабель USB-C 2м;8;4720;1680
-2026-06-17;Зарядное устройство 65W;5;9450;4500
-2026-06-13;"Монитор 27""";15;239850;177000
-2026-05-28;Внешний SSD 1TB;12;107880;73200
-2026-07-08;Мышь Ergo;10;24900;15000
-2026-07-02;Чехол для телефона;4;3560;1520
-2026-08-02;Кабель USB-C 2м;8;4720;1680
-2026-05-12;Кабель USB-C 2м;6;3540;1260
-2026-06-15;Микрофон Studio;13;71370;46800
-2026-06-07;Клавиатура Mech;3;13470;8700
-2026-05-18;Ноутбук-станция;3;149970;115500
-2026-06-16;Внешний SSD 1TB;1;8990;6100
-2026-05-13;Веб-камера HD;10;34900;21000
-2026-05-15;Смартфон Nova X;2;37980;28400
-2026-06-07;Кабель USB-C 2м;3;1770;630
-2026-07-03;Умные часы FitTrack;1;7490;5200
-2026-07-09;Кабель USB-C 2м;6;3540;1260
-2026-06-23;Чехол для телефона;6;5340;2280
-2026-06-18;Мышь Ergo;15;37350;22500
-2026-06-13;Фитнес-браслет Pulse;13;38870;22100
-2026-07-26;Фитнес-браслет Pulse;14;41860;23800
-2026-05-28;Чехол для телефона;1;890;380
-2026-07-08;Смартфон Nova X;6;113940;85200
-2026-05-14;Микрофон Studio;2;10980;7200
-2026-08-02;Смартфон Nova X;13;246870;184600
-2026-08-03;Портативная колонка BoomBox;4;15960;9200
-2026-07-06;Веб-камера HD;3;10470;6300
-2026-05-12;Умные часы FitTrack;8;59920;41600
-2026-07-09;Наушники AirSound Pro;10;59900;38000
-2026-07-04;Чехол для телефона;12;10680;4560
-2026-07-15;Мышь Ergo;6;14940;9000
-2026-07-22;Веб-камера HD;10;34900;21000
-2026-07-16;Мышь Ergo;14;34860;21000
-2026-05-23;Фитнес-браслет Pulse;2;5980;3400
-2026-06-27;Смартфон Nova X;15;284850;213000
-2026-06-18;Веб-камера HD;11;38390;23100
-2026-07-11;Кабель USB-C 2м;12;7080;2520
-2026-05-09;Наушники AirSound Pro;10;59900;38000
-2026-07-05;"Монитор 27""";11;175890;129800
-2026-06-28;Наушники AirSound Pro;12;71880;45600
-2026-05-21;"Монитор 27""";11;175890;129800
-2026-05-25;Мышь Ergo;2;4980;3000
-2026-06-22;Мышь Ergo;1;2490;1500
-2026-05-13;Внешний SSD 1TB;7;62930;42700
-2026-06-02;Зарядное устройство 65W;2;3780;1800
-2026-08-04;Микрофон Studio;6;32940;21600
-2026-06-04;"Монитор 27""";7;111930;82600
-2026-06-20;Наушники AirSound Pro;7;41930;26600
-2026-06-08;Микрофон Studio;15;82350;54000
-2026-06-11;Клавиатура Mech;3;13470;8700
-2026-05-31;Умные часы FitTrack;12;89880;62400
-2026-05-19;Микрофон Studio;5;27450;18000
-2026-05-29;Мышь Ergo;15;37350;22500
-2026-06-07;Мышь Ergo;8;19920;12000
-2026-05-22;Кабель USB-C 2м;14;8260;2940
-2026-07-05;Фитнес-браслет Pulse;6;17940;10200
-2026-07-25;"Монитор 27""";15;239850;177000
-2026-06-09;Фитнес-браслет Pulse;15;44850;25500
-2026-06-07;Портативная колонка BoomBox;13;51870;29900
-2026-05-12;Веб-камера HD;10;34900;21000
-2026-08-02;Кабель USB-C 2м;6;3540;1260
-2026-06-25;Чехол для телефона;14;12460;5320
-2026-07-09;Умные часы FitTrack;8;59920;41600
-2026-07-03;Зарядное устройство 65W;13;24570;11700
-2026-05-21;Зарядное устройство 65W;5;9450;4500
-2026-07-01;Клавиатура Mech;15;67350;43500
-2026-05-31;Внешний SSD 1TB;1;8990;6100
-2026-07-06;Портативная колонка BoomBox;2;7980;4600
-2026-06-04;Клавиатура Mech;7;31430;20300
-2026-07-06;Внешний SSD 1TB;13;116870;79300
-2026-05-15;Клавиатура Mech;8;35920;23200
-2026-06-09;Клавиатура Mech;8;35920;23200
-2026-07-25;Мышь Ergo;1;2490;1500
-2026-06-15;Фитнес-браслет Pulse;4;11960;6800
-2026-06-27;Клавиатура Mech;4;17960;11600
-2026-06-19;Микрофон Studio;10;54900;36000
-2026-05-30;Чехол для телефона;9;8010;3420
-2026-05-27;Зарядное устройство 65W;7;13230;6300
-2026-05-08;Зарядное устройство 65W;6;11340;5400
-2026-06-27;Чехол для телефона;5;4450;1900
-2026-07-21;Фитнес-браслет Pulse;4;11960;6800
-2026-06-26;Клавиатура Mech;4;17960;11600
-2026-05-29;Наушники AirSound Pro;12;71880;45600
-2026-07-13;Мышь Ergo;12;29880;18000
-2026-06-05;Портативная колонка BoomBox;4;15960;9200
-2026-05-22;Фитнес-браслет Pulse;12;35880;20400
-2026-05-21;Мышь Ergo;9;22410;13500
-2026-07-12;Фитнес-браслет Pulse;2;5980;3400
-2026-06-20;Фитнес-браслет Pulse;4;11960;6800
-2026-08-04;Умные часы FitTrack;5;37450;26000
-2026-07-20;Клавиатура Mech;9;40410;26100
-2026-07-30;Фитнес-браслет Pulse;1;2990;1700
-2026-05-08;Внешний SSD 1TB;5;44950;30500
-2026-06-04;Умные часы FitTrack;11;82390;57200
-2026-08-04;Наушники AirSound Pro;14;83860;53200
-2026-06-06;Веб-камера HD;5;17450;10500
-2026-06-23;Чехол для телефона;8;7120;3040
-2026-07-04;Умные часы FitTrack;1;7490;5200
-2026-07-22;"Монитор 27""";8;127920;94400
-2026-06-15;"Монитор 27""";2;31980;23600
-2026-05-24;Чехол для телефона;2;1780;760
-2026-07-30;Микрофон Studio;11;60390;39600
-2026-05-25;Умные часы FitTrack;3;22470;15600
-2026-07-05;Фитнес-браслет Pulse;2;5980;3400
-2026-06-13;Наушники AirSound Pro;9;53910;34200
-2026-05-18;Веб-камера HD;10;34900;21000
-2026-05-31;Портативная колонка BoomBox;13;51870;29900
-2026-06-10;Кабель USB-C 2м;8;4720;1680
-2026-05-22;Фитнес-браслет Pulse;14;41860;23800
-2026-05-25;Кабель USB-C 2м;5;2950;1050
-2026-05-19;Веб-камера HD;1;3490;2100
-2026-07-10;Клавиатура Mech;2;8980;5800
-2026-07-03;Микрофон Studio;4;21960;14400
-2026-07-16;Микрофон Studio;2;10980;7200
-2026-05-27;Портативная колонка BoomBox;3;11970;6900
-2026-08-05;Наушники AirSound Pro;3;17970;11400
-2026-05-09;Кабель USB-C 2м;8;4720;1680
-2026-06-29;Веб-камера HD;8;27920;16800
-2026-06-30;Смартфон Nova X;4;75960;56800
-2026-05-08;Клавиатура Mech;5;22450;14500
-2026-07-27;"Монитор 27""";8;127920;94400
-2026-07-03;Микрофон Studio;4;21960;14400
-2026-05-17;Мышь Ergo;13;32370;19500
-2026-07-11;Веб-камера HD;11;38390;23100
-2026-05-28;Кабель USB-C 2м;2;1180;420
-2026-07-17;Портативная колонка BoomBox;11;43890;25300
-2026-07-18;Ноутбук-станция;5;249950;192500
-2026-07-15;Наушники AirSound Pro;1;5990;3800
-2026-05-21;Мышь Ergo;5;12450;7500
-2026-05-25;Клавиатура Mech;14;62860;40600
-2026-06-10;Ноутбук-станция;5;249950;192500
-2026-05-09;Наушники AirSound Pro;8;47920;30400
-
-
 ======================================================================
 ФАЙЛ: project3_pdf_reports\tests\conftest.py
 ======================================================================
@@ -4353,7 +3896,6 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\tests\test_report.py
@@ -4432,7 +3974,6 @@ def test_mock_data_generator(tmp_path) -> None:
     assert len(rows) - 1 == generate_mock_data.ROWS
     assert all(len(r) == 6 for r in rows[1:])
 
-
 ======================================================================
 ФАЙЛ: project3_pdf_reports\tests\test_smoke.py
 ======================================================================
@@ -4483,7 +4024,6 @@ def test_multi_chunk_date_range(tmp_path) -> None:
     assert report.date_min == "2026-01-01"
     assert report.date_max == "2026-04-01"
 
-
 ======================================================================
 ФАЙЛ: project4_payment_gateway\.dockerignore
 ======================================================================
@@ -4495,7 +4035,6 @@ __pycache__/
 .venv/
 tests/
 .git/
-
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\.env.example
@@ -4524,34 +4063,6 @@ SUBSCRIPTION_DAYS=30
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL=0.7
 
-
-======================================================================
-ФАЙЛ: project4_payment_gateway\.github\workflows\ci.yml
-======================================================================
-name: CI
-
-on:
-  push:
-  pull_request:
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt pytest
-      - name: Compile check
-        run: python -m compileall .
-      - name: Run tests
-        run: python -m pytest tests/ -q
-
-
 ======================================================================
 ФАЙЛ: project4_payment_gateway\.gitignore
 ======================================================================
@@ -4574,7 +4085,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 
-
 ======================================================================
 ФАЙЛ: project4_payment_gateway\Dockerfile
 ======================================================================
@@ -4589,7 +4099,6 @@ COPY . .
 
 # docker run -e WB_BOT_TOKEN=... -e STAR_PAYMENTS=1 ...
 CMD ["python", "bot.py"]
-
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\README.md
@@ -4659,7 +4168,6 @@ python bot.py
 - Бот работает и без активной оплаты: `/subscribe` покажет инвойс, но без
   подтверждения платежа (обработчик `pre_checkout_query`) доступ не откроется —
   это поведение соответствует ТЗ.
-
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\ai_service.py
@@ -4741,7 +4249,6 @@ async def run_analysis(articul: int | None = None) -> str:
             "project2_ai_review_analyst лежит рядом и установлены его зависимости). "
             "Запустите bot.py из этой папки для реального анализа.</i>"
         )
-
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\bot.py
@@ -5046,7 +4553,6 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
-
 ======================================================================
 ФАЙЛ: project4_payment_gateway\config.py
 ======================================================================
@@ -5097,7 +4603,6 @@ def parse_payload(payload: str) -> dict | None:
     if not payload or not payload.startswith("sub:"):
         return None
     return tier_by_key(payload.split(":", 1)[1])
-
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\db.py
@@ -5273,7 +4778,6 @@ class Database:
             await db.commit()
             return cur.rowcount > 0
 
-
 ======================================================================
 ФАЙЛ: project4_payment_gateway\middlewares.py
 ======================================================================
@@ -5338,7 +4842,6 @@ class LoggingMiddleware(BaseMiddleware):
         logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
         return result
 
-
 ======================================================================
 ФАЙЛ: project4_payment_gateway\pyproject.toml
 ======================================================================
@@ -5352,13 +4855,11 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 addopts = "-q"
 
-
 ======================================================================
 ФАЙЛ: project4_payment_gateway\requirements.txt
 ======================================================================
 aiogram>=3.4,<4
 aiosqlite>=0.20
-
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\tests\conftest.py
@@ -5368,7 +4869,6 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\tests\test_smoke.py
@@ -5454,7 +4954,6 @@ def test_ai_service_gate_to_project2() -> None:
     assert "Преимущества" in text
     assert "Проблемы" in text
 
-
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\.dockerignore
 ======================================================================
@@ -5466,7 +4965,6 @@ __pycache__/
 .venv/
 tests/
 .git/
-
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\.env.example
@@ -5488,34 +4986,6 @@ QUIZ_DIFFICULTY=any
 QUIZ_GAME_TTL_SECONDS=1800
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL=0.7
-
-
-======================================================================
-ФАЙЛ: project5_telegram_quiz_bot\.github\workflows\ci.yml
-======================================================================
-name: CI
-
-on:
-  push:
-  pull_request:
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt pytest
-      - name: Compile check
-        run: python -m compileall .
-      - name: Run tests
-        run: python -m pytest tests/ -q
-
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\.gitignore
@@ -5539,7 +5009,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 
-
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\Dockerfile
 ======================================================================
@@ -5554,7 +5023,6 @@ COPY . .
 
 # docker run -e QUIZ_BOT_TOKEN=... -e QUIZ_DEMO_MODE=1 ...
 CMD ["python", "bot.py"]
-
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\README.md
@@ -5622,7 +5090,6 @@ python bot.py
 - Вопросы на английском; при недоступности API (response_code=1 или сеть)
   бот откатывается на встроенный русскоязычный пул.
 - **В демо-режиме (`QUIZ_DEMO_MODE=1`, по умолчанию) сеть не нужна вовсе.**
-
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\bot.py
@@ -5951,7 +5418,6 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
-
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\config.py
 ======================================================================
@@ -5983,7 +5449,6 @@ DEFAULT_DIFFICULTY = os.getenv("QUIZ_DIFFICULTY", "any")
 GAME_TTL_SECONDS = float(os.getenv("QUIZ_GAME_TTL_SECONDS", "1800"))
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
-
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\db.py
@@ -6116,7 +5581,6 @@ class Database:
                 rows = await cur.fetchall()
         return [(r[0] or f"user_{r[1]}", r[1]) for r in rows]
 
-
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\middlewares.py
 ======================================================================
@@ -6181,7 +5645,6 @@ class LoggingMiddleware(BaseMiddleware):
         logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
         return result
 
-
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\pyproject.toml
 ======================================================================
@@ -6194,7 +5657,6 @@ requires-python = ">=3.11"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
-
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\quiz_api.py
@@ -6332,7 +5794,6 @@ class QuizClient:
             for text, options, correct in pool[:amount]
         ]
 
-
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\requirements.txt
 ======================================================================
@@ -6340,7 +5801,6 @@ aiogram>=3.4,<4
 aiosqlite>=0.20
 httpx>=0.27
 pydantic>=2.0
-
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\run_bot5.cmd
@@ -6365,7 +5825,6 @@ set "PYTHONIOENCODING=utf-8"
 
 ..\.venv\Scripts\python.exe -u bot.py
 
-
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\tests\conftest.py
 ======================================================================
@@ -6373,7 +5832,6 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\tests\test_quiz.py
@@ -6496,7 +5954,6 @@ def test_paginate_helper() -> None:
     empty, total, prev, nxt = paginate([], 1)
     assert empty == [] and total == 1 and not prev and not nxt
 
-
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\.dockerignore
 ======================================================================
@@ -6508,7 +5965,6 @@ __pycache__/
 .venv/
 tests/
 .git/
-
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\.env.example
@@ -6532,34 +5988,6 @@ ALERT_CHECK_MINUTES=60
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL=0.7
 
-
-======================================================================
-ФАЙЛ: project6_currency_rate_bot\.github\workflows\ci.yml
-======================================================================
-name: CI
-
-on:
-  push:
-  pull_request:
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt pytest
-      - name: Compile check
-        run: python -m compileall .
-      - name: Run tests
-        run: python -m pytest tests/ -q
-
-
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\.gitignore
 ======================================================================
@@ -6582,7 +6010,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 
-
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\Dockerfile
 ======================================================================
@@ -6597,7 +6024,6 @@ COPY . .
 
 # docker run -e CURRENCY_BOT_TOKEN=... -e CURRENCY_DEMO_MODE=1 ...
 CMD ["python", "bot.py"]
-
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\README.md
@@ -6669,7 +6095,6 @@ python bot.py
 - **В демо-режиме (`CURRENCY_DEMO_MODE=1`, по умолчанию) бот работает без сети**
   с замороженными курсами (±0.5% «живая» вариация).
 
-
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\alerts.py
 ======================================================================
@@ -6726,7 +6151,6 @@ def evaluate_alerts(rates: dict[str, Rate], alerts: list[dict]) -> list[dict]:
         elif alert["direction"] == "above" and current > alert["threshold"]:
             triggered.append({**alert, "current": current})
     return triggered
-
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\bot.py
@@ -7111,7 +6535,6 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
-
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\cbr_api.py
 ======================================================================
@@ -7241,7 +6664,6 @@ class CbrClient:
             return None
         return amount * rate.value / rate.nominal
 
-
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\config.py
 ======================================================================
@@ -7274,7 +6696,6 @@ MAIN_CURRENCIES = os.getenv(
 ALERT_CHECK_MINUTES = int(os.getenv("ALERT_CHECK_MINUTES", "60"))
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
-
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\db.py
@@ -7459,7 +6880,6 @@ class Database:
             rows = await cur.fetchall()
         return [dict(r) for r in rows]
 
-
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\middlewares.py
 ======================================================================
@@ -7524,7 +6944,6 @@ class LoggingMiddleware(BaseMiddleware):
         logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
         return result
 
-
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\pyproject.toml
 ======================================================================
@@ -7538,7 +6957,6 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 addopts = "-q"
 
-
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\requirements.txt
 ======================================================================
@@ -7547,7 +6965,6 @@ aiosqlite>=0.20
 httpx>=0.27
 APScheduler>=3.10,<4
 pydantic>=2.0
-
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\run_bot6.cmd
@@ -7572,7 +6989,6 @@ set "PYTHONIOENCODING=utf-8"
 
 ..\.venv\Scripts\python.exe -u bot.py
 
-
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\tests\conftest.py
 ======================================================================
@@ -7580,7 +6996,6 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\tests\test_cbr.py
@@ -7754,3 +7169,2705 @@ def test_parse_alert_args() -> None:
     assert parse_alert_args(["USD", "-5"]) is None        # порог <= 0
     assert parse_alert_args(["USD", "90", "sideways"]) is None  # неверное направление
     assert parse_alert_args(["USD"]) is None              # мало аргументов
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\.dockerignore
+======================================================================
+.env
+*.db
+*.log
+__pycache__/
+.pytest_cache/
+.venv/
+tests/
+.git/
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\.env.example
+======================================================================
+[TEMPLATE]
+# Токен бота от @BotFather (обязательно)
+WEATHER_BOT_TOKEN=123456:ABC-DEF...
+
+# 1 = демо-режим (выдуманная погода) | 0 = Open-Meteo API (бесплатный, без ключа)
+WEATHER_DEMO_MODE=1
+
+# Час ежедневной рассылки погоды (локальное время)
+DAILY_DIGEST_HOUR=9
+
+# --- Продвинутые настройки ---
+# TTL кэша прогноза (секунды)
+WEATHER_CACHE_TTL_SECONDS=1800
+# Город по умолчанию
+WEATHER_DEFAULT_CITY=Москва
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL=0.7
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\.gitignore
+======================================================================
+.env
+*.db
+*.db-shm
+*.db-wal
+*.log
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\Dockerfile
+======================================================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# docker run -e WEATHER_BOT_TOKEN=... -e WEATHER_DEMO_MODE=1 ...
+CMD ["python", "bot.py"]
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\README.md
+======================================================================
+# Telegram Weather Bot 🌤
+
+Погодный бот для Telegram: текущая погода и прогноз на 7 дней, сохранение города по
+умолчанию, ежедневная рассылка погоды подписчикам. Источник данных — бесплатный API
+**Open-Meteo** (без ключа), геокодинг городов — их же API.
+
+## Возможности
+
+| Команда | Описание |
+|---|---|
+| `/weather [ГОРОД]` | Текущая погода (температура, ветер, влажность, эмодзи) |
+| `/forecast [ГОРОД]` | Прогноз на 7 дней |
+| `/city ГОРОД` | Сохранить город по умолчанию |
+| `/daily on\|off` | Ежедневная рассылка погоды в 9:00 (подписка) |
+
+## Продвинутый уровень (v2)
+
+- **TTL-кэш прогноза** — Open-Meteo обновляет данные раз в час, кэш 30 мин
+  экономит запросы (реализация на stdlib `time.monotonic`, без зависимостей);
+- **Чистые функции парсинга** `_parse_current` / `_parse_forecast` в
+  `weather_api.py` — покрыты unit-тестами без сети;
+- **Демо-режим** — оффлайн-погода со случайным джиттером (±3°): запуск и тесты
+  без интернета;
+- **Middlewares** — троттлинг (анти-спам с «burst»-защитой) и логирование;
+- **APScheduler cron** — ежедневная рассылка, устойчивая к ошибкам по одному
+  подписчику.
+
+## Структура
+
+```
+telegram-weather-bot/
+├── bot.py            # aiogram v3: команды, рассылка, сборка Dispatcher
+├── config.py         # переменные окружения (токен, TTL, час рассылки)
+├── weather_api.py    # httpx-клиент Open-Meteo + чистые функции парсинга
+├── db.py             # aiosqlite: сохранённые города, подписки на рассылку
+├── utils.py          # TTL-кэш, retry с джиттером (stdlib)
+├── middlewares.py    # троттлинг + логирование
+├── tests/            # unit-тесты парсинга, кэша и БД
+├── requirements.txt
+├── pyproject.toml
+├── Dockerfile        # docker run -e WEATHER_BOT_TOKEN=...
+├── .github/workflows/ci.yml  # CI: compileall + pytest на каждый push
+└── run_bot7.cmd      # запуск в Windows (читает TG_TOKEN из корневого .env)
+```
+
+## Запуск
+
+```bash
+pip install -r requirements.txt
+set WEATHER_BOT_TOKEN=123456:ABC...
+set WEATHER_DEMO_MODE=1      # 1 = оффлайн-демо, 0 = реальный Open-Meteo
+python bot.py
+```
+
+Или в Windows — двойной клик по `run_bot7.cmd` (токен берётся из `..\.env`).
+
+## Тесты
+
+```bash
+python -m pytest tests/ -q
+```
+
+## Docker
+
+```bash
+docker build -t telegram-weather-bot .
+docker run -e WEATHER_BOT_TOKEN=... -e WEATHER_DEMO_MODE=1 telegram-weather-bot
+```
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\bot.py
+======================================================================
+"""Telegram Weather Bot (aiogram v3 + Open-Meteo + apscheduler).
+
+Стек: aiogram v3 (Telegram Bot API) + httpx (Open-Meteo, бесплатно без ключа)
++ pydantic (модели погоды) + aiosqlite (города, подписки) + APScheduler
+(ежедневная рассылка).
+
+Команды:
+  /weather [ГОРОД] — текущая погода
+  /forecast [ГОРОД] — прогноз на 7 дней
+  /city ГОРОД — сохранить город по умолчанию
+  /daily on|off — ежедневная рассылка погоды (в 9:00)
+
+Продвинутый уровень:
+  - TTL-кэш прогноза + retry с джиттером (stdlib);
+  - чистые функции парсинга Open-Meteo (_parse_*) — покрыты unit-тестами;
+  - middlewares: троттлинг и логирование.
+
+Запуск:  python bot.py   (задайте WEATHER_BOT_TOKEN, или run_bot7.cmd).
+"""
+from __future__ import annotations
+
+import asyncio
+import html as _html
+import logging
+import os
+
+from aiogram import Bot, Dispatcher, Router
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.filters import Command, CommandStart
+from aiogram.types import Message
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+import config
+from db import Database
+from middlewares import LoggingMiddleware, ThrottlingMiddleware
+from utils import TTLCache
+from weather_api import Geocoder, WeatherClient, _parse_current, _parse_forecast
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(config.BASE_DIR, "bot.log"), encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
+
+router = Router()
+db = Database(config.DB_PATH)
+geocoder = Geocoder()
+weather = WeatherClient()
+forecast_cache = TTLCache(ttl_seconds=config.CACHE_TTL_SECONDS)
+
+# Бот создаётся в main() — нужен планировщику для рассылки
+_bot: Bot | None = None
+scheduler = AsyncIOScheduler()
+
+
+async def _resolve_city(city_arg: str | None, user_id: int) -> tuple[str, float, float] | None:
+    """Определяет город для запроса: аргумент → сохранённый → по умолчанию."""
+    city = (city_arg or "").strip()
+    if not city:
+        user = await db.get_user(user_id)
+        if user and user.get("city"):
+            return user["city"], user["latitude"], user["longitude"]
+        city = config.DEFAULT_CITY
+    point = await geocoder.geocode(city)
+    if point is None:
+        return None
+    return point.name, point.latitude, point.longitude
+
+
+def _format_current(name: str, weather) -> str:
+    desc = weather.describe()
+    return (
+        f"🌤 <b>Погода в {_html.escape(name)}</b>\n\n"
+        f"{desc}\n"
+        f"💨 Ветер: {weather.wind_speed:.0f} км/ч | 💧 Влажность: {weather.humidity:.0f}%"
+    )
+
+
+def _format_forecast(name: str, days) -> str:
+    lines = [f"📅 <b>Прогноз для {_html.escape(name)} на {len(days)} дней</b>\n"]
+    lines += [f"• {d.describe()}" for d in days]
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------- команды
+
+@router.message(CommandStart())
+async def cmd_start(message: Message) -> None:
+    await message.answer(
+        "🌤 <b>Telegram Weather Bot</b>\n\n"
+        "/weather Москва — текущая погода\n"
+        "/forecast Москва — прогноз на 7 дней\n"
+        "/city Москва — сохранить город по умолчанию\n"
+        "/daily on — ежедневная рассылка погоды (в 9:00)\n\n"
+        f"Источник: <b>{'демо-данные' if weather.demo_mode else 'Open-Meteo (бесплатный API)'}</b>"
+    )
+
+
+@router.message(Command("weather"))
+async def cmd_weather(message: Message) -> None:
+    args = message.text.split(maxsplit=1)
+    city_arg = args[1] if len(args) > 1 else None
+    resolved = await _resolve_city(city_arg, message.from_user.id)
+    if resolved is None:
+        await message.answer("Город не найден. Попробуйте иначе: /weather Москва")
+        return
+    name, lat, lon = resolved
+    status = await message.answer(f"Загружаю погоду для <b>{_html.escape(name)}</b>…")
+    try:
+        cur = await forecast_cache.get_or_set(
+            f"cur:{lat},{lon}", lambda: weather.current(lat, lon)
+        )
+    except Exception as exc:
+        logger.exception("Ошибка погоды")
+        await status.edit_text(f"⚠️ Не удалось получить погоду: {exc}")
+        return
+    await status.edit_text(_format_current(name, cur))
+
+
+@router.message(Command("forecast"))
+async def cmd_forecast(message: Message) -> None:
+    args = message.text.split(maxsplit=1)
+    city_arg = args[1] if len(args) > 1 else None
+    resolved = await _resolve_city(city_arg, message.from_user.id)
+    if resolved is None:
+        await message.answer("Город не найден. Попробуйте иначе: /forecast Москва")
+        return
+    name, lat, lon = resolved
+    status = await message.answer(f"Загружаю прогноз для <b>{_html.escape(name)}</b>…")
+    try:
+        days = await forecast_cache.get_or_set(
+            f"fc:{lat},{lon}", lambda: weather.forecast(lat, lon, days=7)
+        )
+    except Exception as exc:
+        logger.exception("Ошибка прогноза")
+        await status.edit_text(f"⚠️ Не удалось получить прогноз: {exc}")
+        return
+    await status.edit_text(_format_forecast(name, days))
+
+
+@router.message(Command("city"))
+async def cmd_city(message: Message) -> None:
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await message.answer("Использование: /city Москва")
+        return
+    point = await geocoder.geocode(args[1])
+    if point is None:
+        await message.answer(f"Город <b>{_html.escape(args[1])}</b> не найден.")
+        return
+    await db.set_city(
+        message.from_user.id, message.from_user.username, point.name,
+        point.latitude, point.longitude,
+    )
+    await message.answer(
+        f"🏙 Город по умолчанию сохранён: <b>{_html.escape(point.name)}</b>\n"
+        f"Теперь просто: /weather"
+    )
+
+
+@router.message(Command("daily"))
+async def cmd_daily(message: Message) -> None:
+    args = message.text.split()
+    if len(args) < 2 or args[1].lower() not in ("on", "off"):
+        await message.answer("Использование: /daily on  или  /daily off")
+        return
+    on = args[1].lower() == "on"
+    if on:
+        user = await db.get_user(message.from_user.id)
+        if not (user and user.get("city")):
+            await message.answer(
+                "Сначала сохраните город: /city Москва — иначе нечего присылать."
+            )
+            return
+    await db.set_digest(message.from_user.id, message.from_user.username, on)
+    await message.answer(
+        f"📬 Ежедневная погода <b>{'включена' if on else 'выключена'}</b> "
+        f"(каждый день в {config.DAILY_DIGEST_HOUR}:00)."
+    )
+
+
+# ------------------------------------------------------------- ежедневная рассылка
+
+async def _daily_job() -> None:
+    """Рассылка текущей погоды подписчикам (apscheduler cron)."""
+    if _bot is None:
+        return
+    for user in await db.digest_users():
+        try:
+            cur = await weather.current(user["latitude"], user["longitude"])
+            await _bot.send_message(
+                user["user_id"], _format_current(user["city"], cur)
+            )
+        except Exception:
+            logger.exception("Рассылка: не удалось отправить погоду user_id=%s", user["user_id"])
+            continue
+        await asyncio.sleep(0.3)
+
+
+async def main() -> None:
+    global _bot
+    if not config.BOT_TOKEN:
+        raise SystemExit("Не задан WEATHER_BOT_TOKEN. Скопируйте .env.example и задайте токен.")
+    _bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    dp = Dispatcher()
+    dp.include_router(router)
+    dp.message.middleware(ThrottlingMiddleware(min_interval=config.THROTTLE_MIN_INTERVAL))
+    dp.update.middleware(LoggingMiddleware())
+    await db.init()
+    scheduler.add_job(_daily_job, "cron", hour=config.DAILY_DIGEST_HOUR, minute=0)
+    scheduler.start()
+    logger.info(
+        "Погодный бот запущен. Источник: %s",
+        "демо-данные" if weather.demo_mode else "Open-Meteo",
+    )
+    try:
+        await dp.start_polling(_bot)
+    finally:
+        await _bot.session.close()
+        scheduler.shutdown(wait=False)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\config.py
+======================================================================
+"""Конфигурация Telegram Weather Bot через переменные окружения."""
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+BOT_TOKEN = os.getenv("WEATHER_BOT_TOKEN", "")
+DB_PATH = os.getenv("WEATHER_DB_PATH", os.path.join(BASE_DIR, "weather.db"))
+
+# 1 = демо-режим (выдуманная погода, сеть не нужна) | 0 = Open-Meteo API
+DEMO_MODE = os.getenv("WEATHER_DEMO_MODE", "1") == "1"
+
+# Бесплатный API без ключа: https://open-meteo.com/en/docs
+GEOCODING_URL = os.getenv(
+    "GEOCODING_URL",
+    "https://geocoding-api.open-meteo.com/v1/search",
+)
+FORECAST_URL = os.getenv(
+    "FORECAST_URL",
+    "https://api.open-meteo.com/v1/forecast",
+)
+API_TIMEOUT = float(os.getenv("WEATHER_API_TIMEOUT", "10"))
+
+# Час ежедневной рассылки погоды (локальное время)
+DAILY_DIGEST_HOUR = int(os.getenv("DAILY_DIGEST_HOUR", "9"))
+
+# --- Продвинутый уровень ---
+# TTL кэша прогноза (секунды): Open-Meteo обновляет прогноз раз в час
+CACHE_TTL_SECONDS = float(os.getenv("WEATHER_CACHE_TTL_SECONDS", "1800"))
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
+# Город по умолчанию для пользователей без сохранённого города
+DEFAULT_CITY = os.getenv("WEATHER_DEFAULT_CITY", "Москва")
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\db.py
+======================================================================
+"""SQLite-БД (aiosqlite): сохранённые города пользователей и подписки
+на ежедневную рассылку погоды."""
+from __future__ import annotations
+
+import aiosqlite
+
+
+class Database:
+    def __init__(self, path: str) -> None:
+        self.path = path
+
+    async def init(self) -> None:
+        async with aiosqlite.connect(self.path) as db:
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id      INTEGER PRIMARY KEY,
+                    username     TEXT,
+                    city         TEXT,
+                    latitude     REAL,
+                    longitude    REAL,
+                    daily_digest INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+            await db.commit()
+
+    async def set_city(
+        self, user_id: int, username: str | None, city: str, lat: float, lon: float
+    ) -> None:
+        async with aiosqlite.connect(self.path) as db:
+            await db.execute(
+                """
+                INSERT INTO users (user_id, username, city, latitude, longitude, daily_digest)
+                VALUES (?, ?, ?, ?, ?, 0)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    username = excluded.username,
+                    city = excluded.city,
+                    latitude = excluded.latitude,
+                    longitude = excluded.longitude
+                """,
+                (user_id, username or "", city, lat, lon),
+            )
+            await db.commit()
+
+    async def get_user(self, user_id: int) -> dict | None:
+        async with aiosqlite.connect(self.path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT * FROM users WHERE user_id = ?", (user_id,)
+            )
+            row = await cur.fetchone()
+        return dict(row) if row else None
+
+    async def set_digest(self, user_id: int, username: str | None, on: bool) -> None:
+        async with aiosqlite.connect(self.path) as db:
+            await db.execute(
+                """
+                INSERT INTO users (user_id, username, daily_digest)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    username = excluded.username,
+                    daily_digest = excluded.daily_digest
+                """,
+                (user_id, username or "", 1 if on else 0),
+            )
+            await db.commit()
+
+    async def digest_users(self) -> list[dict]:
+        """Пользователи с включённой рассылкой и сохранённым городом."""
+        async with aiosqlite.connect(self.path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT * FROM users WHERE daily_digest = 1 AND city IS NOT NULL"
+            )
+            rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\middlewares.py
+======================================================================
+"""Middlewares aiogram v3: троттлинг и логирование (продвинутый уровень)."""
+from __future__ import annotations
+
+import logging
+import time
+from collections import defaultdict
+from typing import Any, Awaitable, Callable
+
+from aiogram import BaseMiddleware
+from aiogram.types import TelegramObject
+
+logger = logging.getLogger(__name__)
+
+
+class ThrottlingMiddleware(BaseMiddleware):
+    """Ограничивает частоту сообщений от одного пользователя."""
+
+    def __init__(self, min_interval: float = 0.7, burst: int = 3) -> None:
+        self._min_interval = min_interval
+        self._burst = burst
+        self._last: dict[int, float] = {}
+        self._streak: dict[int, int] = defaultdict(int)
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        user_id = getattr(getattr(event, "from_user", None), "id", None)
+        if user_id is not None:
+            now = time.monotonic()
+            last = self._last.get(user_id)
+            if last is not None and now - last < self._min_interval:
+                self._streak[user_id] += 1
+                if self._streak[user_id] >= self._burst:
+                    logger.warning(
+                        "Throttle: пользователь %s шлёт сообщения чаще, чем раз в %.1fs",
+                        user_id, self._min_interval,
+                    )
+                return None
+            self._last[user_id] = now
+            self._streak[user_id] = 0
+        return await handler(event, data)
+
+
+class LoggingMiddleware(BaseMiddleware):
+    """Замеряет и пишет в лог время обработки каждого апдейта."""
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        start = time.perf_counter()
+        result = await handler(event, data)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
+        return result
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\pyproject.toml
+======================================================================
+[project]
+name = "telegram-weather-bot"
+version = "1.0.0"
+description = "Погода в Telegram: Open-Meteo (без ключа) + рассылка + кэш"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\requirements.txt
+======================================================================
+aiogram>=3.4,<4
+aiosqlite>=0.20
+httpx>=0.27
+pydantic>=2.0
+APScheduler>=3.10,<4
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\run_bot7.cmd
+======================================================================
+@echo off
+rem Launch script for Telegram Weather Bot (Project 7).
+rem Reads TG_TOKEN from the root .env, sets WEATHER_BOT_TOKEN, runs the bot.
+cd /d "%~dp0"
+
+for /f "usebackq tokens=1,* delims==" %%a in ("..\.env") do (
+    if "%%a"=="TG_TOKEN" set "WEATHER_BOT_TOKEN=%%b"
+)
+if not defined WEATHER_BOT_TOKEN (
+    echo [ERROR] TG_TOKEN not found in ..\.env
+    pause
+    exit /b 1
+)
+
+rem 0 = real Open-Meteo API | 1 = demo mode (offline)
+set "WEATHER_DEMO_MODE=1"
+set "PYTHONIOENCODING=utf-8"
+
+..\.venv\Scripts\python.exe -u bot.py
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\tests\conftest.py
+======================================================================
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\tests\test_weather.py
+======================================================================
+"""Unit-тесты Weather Bot: парсинг Open-Meteo, WMO, демо-режим, БД."""
+import asyncio
+
+import httpx
+
+from db import Database
+from weather_api import (
+    Geocoder,
+    WeatherClient,
+    _parse_current,
+    _parse_forecast,
+    _parse_geocode,
+    wmo,
+)
+
+GEO_PAYLOAD = {
+    "results": [
+        {"name": "Москва", "latitude": 55.75, "longitude": 37.62, "country": "Россия"}
+    ]
+}
+
+FORECAST_PAYLOAD = {
+    "current": {
+        "time": "2026-08-07T12:00",
+        "temperature_2m": 21.3,
+        "relative_humidity_2m": 64.0,
+        "wind_speed_10m": 7.5,
+        "weather_code": 3,
+    },
+    "daily": {
+        "time": ["2026-08-07", "2026-08-08"],
+        "weather_code": [3, 61],
+        "temperature_2m_max": [24.1, 19.4],
+        "temperature_2m_min": [15.2, 12.0],
+        "precipitation_probability_max": [10, 80],
+    },
+}
+
+
+class FakeTransport(httpx.AsyncBaseTransport):
+    def __init__(self, payload: dict) -> None:
+        self.payload = payload
+
+    async def handle_async_request(self, request):
+        return httpx.Response(200, json=self.payload, request=request)
+
+
+def test_wmo_map() -> None:
+    assert wmo(0) == ("Ясно", "☀️")
+    assert wmo(95) == ("Гроза", "⛈")
+    assert wmo(999)[0] == "Неизвестно"  # неизвестный код не падает
+
+
+def test_parse_geocode() -> None:
+    point = _parse_geocode(GEO_PAYLOAD)
+    assert point is not None
+    assert point.name == "Москва"
+    assert point.latitude == 55.75
+    assert point.longitude == 37.62
+    assert _parse_geocode({"results": []}) is None
+    assert _parse_geocode({}) is None
+
+
+def test_parse_current() -> None:
+    cur = _parse_current(FORECAST_PAYLOAD)
+    assert cur.temperature == 21.3
+    assert cur.humidity == 64.0
+    assert cur.wind_speed == 7.5
+    assert cur.code == 3
+    assert "Пасмурно" in cur.describe()
+
+
+def test_parse_forecast() -> None:
+    days = _parse_forecast(FORECAST_PAYLOAD)
+    assert len(days) == 2
+    assert days[0].date == "2026-08-07"
+    assert days[0].t_max == 24.1
+    assert days[1].precip_prob == 80.0
+    assert "2026-08-08" in days[1].describe()
+
+
+def test_demo_mode_geocoder_and_weather() -> None:
+    async def run() -> None:
+        point = await Geocoder(demo_mode=True).geocode("казань")
+        assert point is not None and point.name == "Казань"
+        client = WeatherClient(demo_mode=True)
+        cur = await client.current(55.0, 49.0)
+        assert -40 <= cur.temperature <= 40
+        days = await client.forecast(55.0, 49.0, days=7)
+        assert len(days) == 7
+
+    asyncio.run(run())
+
+
+def test_real_client_with_fake_transport() -> None:
+    """Реальный клиент с подменой транспорта (без сети) парсит ответ Open-Meteo."""
+    async def run() -> None:
+        client = WeatherClient(demo_mode=False, transport=FakeTransport(FORECAST_PAYLOAD))
+        cur = await client.current(55.75, 37.62)
+        assert cur.temperature == 21.3
+        days = await client.forecast(55.75, 37.62, days=2)
+        assert len(days) == 2
+
+    asyncio.run(run())
+
+
+def test_db_city_and_digest(tmp_path) -> None:
+    async def run() -> None:
+        db = Database(str(tmp_path / "weather.db"))
+        await db.init()
+        await db.set_city(1, "alice", "Москва", 55.75, 37.62)
+        user = await db.get_user(1)
+        assert user["city"] == "Москва" and user["daily_digest"] == 0
+        assert await db.get_user(999) is None
+
+        await db.set_digest(1, "alice", True)
+        await db.set_digest(2, "bob", True)  # без города — не попадёт в рассылку
+        digest = await db.digest_users()
+        assert [u["user_id"] for u in digest] == [1]
+
+    asyncio.run(run())
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\utils.py
+======================================================================
+"""Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером."""
+from __future__ import annotations
+
+import asyncio
+import functools
+import logging
+import random
+import time
+from typing import Any, Awaitable, Callable, TypeVar
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+class TTLCache:
+    """TTL-кэш: значение живёт ttl секунд после записи."""
+
+    def __init__(self, ttl_seconds: float = 300.0) -> None:
+        self._ttl = ttl_seconds
+        self._store: dict[Any, tuple[float, Any]] = {}
+
+    def get(self, key: Any) -> Any | None:
+        item = self._store.get(key)
+        if item is None:
+            return None
+        expires, value = item
+        if time.monotonic() > expires:
+            self._store.pop(key, None)
+            return None
+        return value
+
+    async def get_or_set(self, key: Any, factory: Callable[[], Awaitable[T]]) -> T:
+        cached = self.get(key)
+        if cached is not None:
+            return cached
+        value = await factory()
+        self._store[key] = (time.monotonic() + self._ttl, value)
+        return value
+
+    def invalidate(self, key: Any | None = None) -> None:
+        if key is None:
+            self._store.clear()
+        else:
+            self._store.pop(key, None)
+
+    @property
+    def size(self) -> int:
+        return len(self._store)
+
+
+def backoff(attempt: int, base: float = 0.5, max_delay: float = 10.0, jitter: float = 0.3) -> float:
+    """Экспоненциальный backoff с джиттером: base * 2^(attempt-1), ±jitter%."""
+    delay = min(base * (2 ** (attempt - 1)), max_delay)
+    return delay * (1 + random.uniform(-jitter, jitter))
+
+
+def async_retry(
+    retries: int = 3,
+    base: float = 0.5,
+    retry_on: tuple[type[Exception], ...] = (Exception,),
+):
+    """Декоратор для асинхронных функций: повторы с экспоненциальным backoff."""
+
+    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+        @functools.wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> T:
+            last: Exception | None = None
+            for attempt in range(1, retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except retry_on as exc:
+                    last = exc
+                    if attempt == retries:
+                        break
+                    await asyncio.sleep(backoff(attempt, base=base))
+            assert last is not None
+            raise last
+
+        return wrapper
+
+    return decorator
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\weather_api.py
+======================================================================
+"""Погода через Open-Meteo (бесплатный API без ключа) + демо-режим.
+
+Источники (официальная документация: https://open-meteo.com/en/docs):
+  - Геокодинг: /v1/search?name=Москва&count=1&language=ru
+  - Прогноз:   /v1/forecast?latitude=..&longitude=..&current=..&daily=..
+
+Парсинг ответов вынесен в чистые функции (_parse_*) — их легко покрыть
+unit-тестами без сети. Демо-режим (WEATHER_DEMO_MODE=1) отдаёт выдуманные
+данные, чтобы бот работал без интернета.
+"""
+from __future__ import annotations
+
+import random
+from urllib.parse import urlencode
+
+import httpx
+from pydantic import BaseModel
+
+import config
+from utils import async_retry
+
+# Коды погоды WMO → (описание, эмодзи). Полная таблица: https://open-meteo.com/en/docs
+WMO_CODES: dict[int, tuple[str, str]] = {
+    0: ("Ясно", "☀️"), 1: ("Преимущественно ясно", "🌤"), 2: ("Переменная облачность", "⛅"),
+    3: ("Пасмурно", "☁️"), 45: ("Туман", "🌫"), 48: ("Изморозь", "🌫"),
+    51: ("Мелкая морось", "🌦"), 53: ("Морось", "🌦"), 55: ("Сильная морось", "🌧"),
+    61: ("Небольшой дождь", "🌦"), 63: ("Дождь", "🌧"), 65: ("Сильный дождь", "🌧"),
+    66: ("Ледяной дождь", "🌧"), 67: ("Сильный ледяной дождь", "🌧"),
+    71: ("Небольшой снег", "🌨"), 73: ("Снег", "🌨"), 75: ("Сильный снег", "❄️"),
+    77: ("Снежная крупа", "🌨"), 80: ("Ливень", "🌧"), 81: ("Ливень", "🌧"),
+    82: ("Сильный ливень", "⛈"), 85: ("Снегопад", "🌨"), 86: ("Сильный снегопад", "❄️"),
+    95: ("Гроза", "⛈"), 96: ("Гроза с градом", "⛈"), 99: ("Гроза с сильным градом", "⛈"),
+}
+
+
+def wmo(code: int) -> tuple[str, str]:
+    """(описание, эмодзи) по коду погоды WMO."""
+    return WMO_CODES.get(int(code), ("Неизвестно", "🌡"))
+
+
+class GeoPoint(BaseModel):
+    name: str
+    latitude: float
+    longitude: float
+    country: str = ""
+
+
+class CurrentWeather(BaseModel):
+    time: str = ""
+    temperature: float
+    wind_speed: float = 0.0
+    humidity: float = 0.0
+    code: int = 0
+
+    def describe(self) -> str:
+        desc, emoji = wmo(self.code)
+        return f"{emoji} {desc}, {self.temperature:.0f}°C"
+
+
+class DayForecast(BaseModel):
+    date: str
+    code: int = 0
+    t_max: float
+    t_min: float
+    precip_prob: float = 0.0
+
+    def describe(self) -> str:
+        desc, emoji = wmo(self.code)
+        return (
+            f"{self.date}: {emoji} {desc}, "
+            f"{self.t_min:.0f}…{self.t_max:.0f}°C, осадки {self.precip_prob:.0f}%"
+        )
+
+
+def _parse_geocode(payload: dict) -> GeoPoint | None:
+    """Разбирает ответ геокодинга Open-Meteo → GeoPoint."""
+    results = payload.get("results") or []
+    if not results:
+        return None
+    first = results[0]
+    return GeoPoint(
+        name=str(first.get("name") or "?"),
+        latitude=float(first["latitude"]),
+        longitude=float(first["longitude"]),
+        country=str(first.get("country") or ""),
+    )
+
+
+def _parse_current(payload: dict) -> CurrentWeather:
+    """Разбирает секцию current ответа /v1/forecast."""
+    cur = payload.get("current") or {}
+    return CurrentWeather(
+        time=str(cur.get("time") or ""),
+        temperature=float(cur.get("temperature_2m") or 0),
+        wind_speed=float(cur.get("wind_speed_10m") or 0),
+        humidity=float(cur.get("relative_humidity_2m") or 0),
+        code=int(cur.get("weather_code") or 0),
+    )
+
+
+def _parse_forecast(payload: dict) -> list[DayForecast]:
+    """Разбирает секцию daily ответа /v1/forecast → список дней."""
+    daily = payload.get("daily") or {}
+    times = daily.get("time") or []
+    codes = daily.get("weather_code") or []
+    t_max = daily.get("temperature_2m_max") or []
+    t_min = daily.get("temperature_2m_min") or []
+    precip = daily.get("precipitation_probability_max") or []
+    days = []
+    for i, day in enumerate(times):
+        days.append(
+            DayForecast(
+                date=str(day),
+                code=int(codes[i]) if i < len(codes) else 0,
+                t_max=float(t_max[i]) if i < len(t_max) else 0.0,
+                t_min=float(t_min[i]) if i < len(t_min) else 0.0,
+                precip_prob=float(precip[i]) if i < len(precip) else 0.0,
+            )
+        )
+    return days
+
+
+class Geocoder:
+    """Поиск координат города по названию (Open-Meteo geocoding)."""
+
+    def __init__(
+        self,
+        *,
+        demo_mode: bool | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        self.demo_mode = config.DEMO_MODE if demo_mode is None else demo_mode
+        self._transport = transport
+
+    async def geocode(self, city: str) -> GeoPoint | None:
+        if self.demo_mode:
+            return GeoPoint(name=city.strip().title(), latitude=55.75, longitude=37.62)
+        params = {"name": city, "count": 1, "language": "ru", "format": "json"}
+        async with httpx.AsyncClient(timeout=config.API_TIMEOUT, transport=self._transport) as client:
+            resp = await client.get(config.GEOCODING_URL, params=params)
+            resp.raise_for_status()
+            payload = resp.json()
+        return _parse_geocode(payload)
+
+
+class WeatherClient:
+    """Текущая погода и прогноз (Open-Meteo forecast)."""
+
+    def __init__(
+        self,
+        *,
+        demo_mode: bool | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        self.demo_mode = config.DEMO_MODE if demo_mode is None else demo_mode
+        self._transport = transport
+
+    async def current(self, lat: float, lon: float) -> CurrentWeather:
+        if self.demo_mode:
+            return CurrentWeather(
+                time="now",
+                temperature=round(random.uniform(-5, 30), 1),
+                wind_speed=round(random.uniform(0, 15), 1),
+                humidity=round(random.uniform(30, 95)),
+                code=random.choice(list(WMO_CODES)),
+            )
+        payload = await self._fetch(lat, lon)
+        return _parse_current(payload)
+
+    async def forecast(self, lat: float, lon: float, days: int = 7) -> list[DayForecast]:
+        if self.demo_mode:
+            result = []
+            for offset in range(days):
+                result.append(
+                    DayForecast(
+                        date=f"day+{offset}",
+                        code=random.choice(list(WMO_CODES)),
+                        t_min=round(random.uniform(-5, 15), 1),
+                        t_max=round(random.uniform(10, 35), 1),
+                        precip_prob=round(random.uniform(0, 90)),
+                    )
+                )
+            return result
+        payload = await self._fetch(lat, lon, days=days)
+        return _parse_forecast(payload)
+
+    @async_retry(retries=3, retry_on=(httpx.HTTPError,))
+    async def _fetch(self, lat: float, lon: float, days: int = 1) -> dict:
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code",
+            "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+            "timezone": "auto",
+            "forecast_days": days,
+        }
+        async with httpx.AsyncClient(timeout=config.API_TIMEOUT, transport=self._transport) as client:
+            resp = await client.get(config.FORECAST_URL, params=params)
+            resp.raise_for_status()
+            return resp.json()
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\.dockerignore
+======================================================================
+.env
+*.db
+*.log
+*.csv
+__pycache__/
+.pytest_cache/
+.venv/
+tests/
+.git/
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\.env.example
+======================================================================
+# Telegram Bot токен (выдаёт @BotFather). ВАЖНО: никогда не коммитьте реальный токен!
+EXPENSE_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+
+# Путь к SQLite-БД (по умолчанию expenses.db рядом с ботом)
+# EXPENSE_DB_PATH=C:\data\expenses.db
+
+# Минимальный интервал между сообщениями пользователя, сек
+# THROTTLE_MIN_INTERVAL=0.7
+
+# Лимит суммы одного расхода (защита от опечаток)
+# MAX_AMOUNT=1000000
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\.gitignore
+======================================================================
+.env
+*.db
+*.db-shm
+*.db-wal
+*.log
+export_*.csv
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\Dockerfile
+======================================================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# docker run -e EXPENSE_BOT_TOKEN=... -v expenses_vol:/app ...
+CMD ["python", "bot.py"]
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\README.md
+======================================================================
+# Telegram Expense Tracker 🧾
+
+Личный трекер расходов в Telegram: запись трат одной строкой, автоматическая
+категоризация, отчёты по периодам и категориям, экспорт в CSV (открывается в Excel).
+
+## Возможности
+
+| Команда | Описание |
+|---|---|
+| `/add 500 кофе` | Записать расход: сумма + примечание, категория определится сама |
+| `/today` `/week` `/month` | Итого за сегодня / 7 дней / месяц |
+| `/report` | Разбивка по категориям с долями |
+| `/recent` | Последние 10 записей |
+| `/export` | CSV-файл за месяц (utf-8-sig — Excel-совместимый) |
+
+## Продвинутый уровень (v2)
+
+- **Автокатегоризация** по ключевым словам — чистая функция `parse_expense`
+  (парсинг суммы с запятой, лимит суммы, фолбэк-категория «Разное»), покрыта
+  unit-тестами без Telegram и БД;
+- **Агрегаты в SQL** — итоги и разбивка по категориям считаются запросами по
+  диапазону дат (`GROUP BY`, `BETWEEN`), без загрузки всех строк в память;
+- **Индекс** `(user_id, created_at)` под все отчёты;
+- **CSV с BOM** (`utf-8-sig`) — кириллица корректно открывается в Excel;
+- **Middlewares** — троттлинг (анти-спам) и логирование;
+- **Лимит суммы** — защита от опечаток вроде `/add 500000000`.
+
+## Структура
+
+```
+telegram-expense-tracker/
+├── bot.py            # aiogram v3: команды, форматирование сумм, экспорт
+├── config.py         # переменные окружения (токен, лимит суммы)
+├── categories.py     # ЧИСТЫЕ функции: categorize(), parse_expense()
+├── db.py             # aiosqlite: расходы, агрегаты, CSV-экспорт
+├── middlewares.py    # троттлинг + логирование
+├── tests/            # unit-тесты парсинга, категорий и БД
+├── requirements.txt
+├── pyproject.toml
+├── Dockerfile        # docker run -e EXPENSE_BOT_TOKEN=...
+├── .github/workflows/ci.yml  # CI: compileall + pytest на каждый push
+└── run_bot8.cmd      # запуск в Windows (читает TG_TOKEN из корневого .env)
+```
+
+## Запуск
+
+```bash
+pip install -r requirements.txt
+set EXPENSE_BOT_TOKEN=123456:ABC...
+python bot.py
+```
+
+Или в Windows — двойной клик по `run_bot8.cmd` (токен берётся из `..\.env`).
+
+## Пример
+
+```
+Вы:   /add 500 кофе
+Бот:  ✅ Записано: 500,00 ₽ — кофе
+      🏷 Категория: Продукты (№1)
+
+Вы:   /report
+Бот:  📊 Расходы за месяц: 5 430,00 ₽
+      Продукты — 2 300,00 ₽ (42%)
+      Транспорт — 1 200,00 ₽ (22%)
+      ...
+```
+
+## Тесты
+
+```bash
+python -m pytest tests/ -q
+```
+
+## Docker
+
+```bash
+docker build -t telegram-expense-tracker .
+docker run -e EXPENSE_BOT_TOKEN=... telegram-expense-tracker
+```
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\bot.py
+======================================================================
+"""Telegram Expense Tracker (aiogram v3 + aiosqlite).
+
+Стек: aiogram v3 (Telegram Bot API) + aiosqlite (хранение расходов) —
+без внешних платных сервисов; вся «магия» на чистом Python.
+
+Команды:
+  /add 500 кофе        — записать расход (сумма + примечание, автокатегория)
+  /today /week /month  — итого за период
+  /report              — разбивка по категориям (кто съедает бюджет)
+  /recent              — последние 10 записей
+  /export              — CSV-файл расходов за месяц (открывается в Excel)
+
+Продвинутый уровень:
+  - автокатегоризация по ключевым словам (чистая функция, unit-тесты);
+  - агрегаты считаются SQL-запросами по диапазону дат — без загрузки
+    всех строк в память;
+  - экспорт CSV в кодировке utf-8-sig (совместим с Excel);
+  - middlewares: троттлинг и логирование.
+
+Запуск:  python bot.py   (задайте EXPENSE_BOT_TOKEN, или run_bot8.cmd).
+"""
+from __future__ import annotations
+
+import asyncio
+import html as _html
+import logging
+import os
+from datetime import date, timedelta
+
+from aiogram import Bot, Dispatcher, Router
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.filters import Command, CommandStart
+from aiogram.types import FSInputFile, Message
+
+import config
+from categories import parse_expense
+from db import Database
+from middlewares import LoggingMiddleware, ThrottlingMiddleware
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(config.BASE_DIR, "bot.log"), encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
+
+router = Router()
+db = Database(config.DB_PATH)
+
+START_TEXT = (
+    "🧾 <b>Telegram Expense Tracker</b>\n\n"
+    "/add 500 кофе — записать расход\n"
+    "/today — расходы за сегодня\n"
+    "/week — за 7 дней\n"
+    "/month — за месяц\n"
+    "/report — по категориям\n"
+    "/recent — последние записи\n"
+    "/export — выгрузить месяц в CSV\n\n"
+    "Формат расхода: сумма + примечание (категория определится сама)."
+)
+
+
+def _money(value: float) -> str:
+    """1000.5 → '1 000,50 ₽' — человекочитаемый вывод суммы."""
+    return f"{value:,.2f}".replace(",", " ").replace(".", ",") + " ₽"
+
+
+def _period_dates(period: str) -> tuple[date, date]:
+    today = date.today()
+    if period == "today":
+        return today, today
+    if period == "week":
+        return today - timedelta(days=6), today
+    return today.replace(day=1), today  # month
+
+
+# ---------------------------------------------------------------- команды
+
+@router.message(CommandStart())
+@router.message(Command("help"))
+async def cmd_start(message: Message) -> None:
+    await message.answer(START_TEXT)
+
+
+@router.message(Command("add"))
+async def cmd_add(message: Message) -> None:
+    args = message.text.split(maxsplit=1)
+    parsed = parse_expense(args[1] if len(args) > 1 else "", max_amount=config.MAX_AMOUNT)
+    if parsed is None:
+        await message.answer(
+            "⚠️ Не понял формат. Пример: <code>/add 500 кофе</code>\n"
+            f"Сумма — число от 0 до {config.MAX_AMOUNT:,.0f}."
+        )
+        return
+    amount, note, category = parsed
+    row_id = await db.add_expense(message.from_user.id, amount, category, note)
+    await message.answer(
+        f"✅ Записано: <b>{_money(amount)}</b> — {_html.escape(note or category)}\n"
+        f"🏷 Категория: <b>{_html.escape(category)}</b> (№{row_id})"
+    )
+
+
+@router.message(Command("today"))
+@router.message(Command("week"))
+@router.message(Command("month"))
+async def cmd_period(message: Message) -> None:
+    period = message.text.lstrip("/").split()[0]
+    start, end = _period_dates(period)
+    total = await db.total_between(message.from_user.id, start, end)
+    labels = {"today": "сегодня", "week": "за 7 дней", "month": "в этом месяце"}
+    await message.answer(
+        f"💸 Расходы <b>{labels[period]}</b>: <b>{_money(total)}</b>"
+    )
+
+
+@router.message(Command("report"))
+async def cmd_report(message: Message) -> None:
+    start, end = _period_dates("month")
+    by_cat = await db.by_category(message.from_user.id, start, end)
+    if not by_cat:
+        await message.answer("В этом месяце расходов пока нет. Добавьте первый: /add 500 кофе")
+        return
+    total = sum(by_cat.values())
+    lines = [f"📊 <b>Расходы за месяц: {_money(total)}</b>\n"]
+    lines += [
+        f"{_html.escape(cat)} — <b>{_money(v)}</b> "
+        f"({v / total * 100:.0f}%)"
+        for cat, v in by_cat.items()
+    ]
+    await message.answer("\n".join(lines))
+
+
+@router.message(Command("recent"))
+async def cmd_recent(message: Message) -> None:
+    rows = await db.recent(message.from_user.id, limit=10)
+    if not rows:
+        await message.answer("Записей пока нет. Добавьте первую: /add 500 кофе")
+        return
+    lines = ["🕘 <b>Последние записи</b>"]
+    lines += [
+        f"{r['created_at']} · <b>{_money(r['amount'])}</b> "
+        f"({_html.escape(r['category'])}) {_html.escape(r['note'])}"
+        for r in rows
+    ]
+    await message.answer("\n".join(lines))
+
+
+@router.message(Command("export"))
+async def cmd_export(message: Message) -> None:
+    start, end = _period_dates("month")
+    path = os.path.join(config.BASE_DIR, f"export_{message.from_user.id}.csv")
+    count = await db.export_csv(path, message.from_user.id, start, end)
+    if count == 0:
+        await message.answer("За этот месяц записей нет — экспортировать нечего.")
+        return
+    await message.answer_document(
+        FSInputFile(path, filename=f"expenses_{start.isoformat()}_{end.isoformat()}.csv"),
+        caption=f"📄 Расходы за месяц: {count} записей, "
+                f"итого {_money(await db.total_between(message.from_user.id, start, end))}",
+    )
+
+
+async def main() -> None:
+    if not config.BOT_TOKEN:
+        raise SystemExit("Не задан EXPENSE_BOT_TOKEN. Скопируйте .env.example и задайте токен.")
+    bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    dp = Dispatcher()
+    dp.include_router(router)
+    dp.message.middleware(ThrottlingMiddleware(min_interval=config.THROTTLE_MIN_INTERVAL))
+    dp.update.middleware(LoggingMiddleware())
+    await db.init()
+    logger.info("Expense Tracker запущен.")
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\categories.py
+======================================================================
+"""Категории расходов: автокатегоризация по ключевым словам + парсинг /add.
+
+Чистые функции — легко тестируются без Telegram и БД.
+
+Формат: /add 500 кофе
+  - сумма — первое слово (можно с запятой: 500,50);
+  - примечание — остаток строки;
+  - категория — по ключевым словам в примечании, иначе «Разное».
+"""
+from __future__ import annotations
+
+# Ключевые слова → категория (проверка подстроки, регистр не важен)
+KEYWORDS: dict[str, list[str]] = {
+    "Продукты": [
+        "кофе", "обед", "ужин", "завтрак", "продукт", "еда", "магазин",
+        "пятёрочка", "перекрёсток", "лента", "ашан", "овощи", "мясо",
+    ],
+    "Транспорт": [
+        "такси", "метро", "бензин", "автобус", "трамвай", "троллейбус",
+        "каршер", "парковка", "проезд",
+    ],
+    "Жильё": [
+        "квартплат", "аренд", "коммунал", "ипотек", "жильё", "электричеств",
+    ],
+    "Связь и интернет": ["интернет", "телефон", "мобильн", "связь", "оператор", "тариф"],
+    "Развлечения": [
+        "кино", "игр", "концерт", "подписк", "театр", "фитнес", "спортзал", "развлечен",
+    ],
+    "Здоровье": ["аптек", "лекар", "врач", "здоров", "больниц", "витамин"],
+    "Одежда": ["одежд", "куртк", "обув", "кроссовк", "футболк", "джинс"],
+}
+
+FALLBACK_CATEGORY = "Разное"
+
+
+def categorize(note: str) -> str:
+    """Определяет категорию по ключевым словам в примечании."""
+    text = note.lower()
+    for category, keys in KEYWORDS.items():
+        if any(key in text for key in keys):
+            return category
+    return FALLBACK_CATEGORY
+
+
+def parse_expense(text: str, max_amount: float = 1_000_000) -> tuple[float, str, str] | None:
+    """'/add 500 кофе' → (500.0, 'кофе', 'Продукты'); None — если невалидно.
+
+    text — аргументы команды без самого '/add' (например '500 кофе').
+    """
+    parts = text.strip().split(maxsplit=1)
+    if not parts:
+        return None
+    try:
+        amount = float(parts[0].replace(",", "."))
+    except ValueError:
+        return None
+    if amount <= 0 or amount > max_amount:
+        return None
+    note = parts[1].strip() if len(parts) > 1 else ""
+    return amount, note, categorize(note)
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\config.py
+======================================================================
+"""Конфигурация Expense Tracker Bot через переменные окружения."""
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+BOT_TOKEN = os.getenv("EXPENSE_BOT_TOKEN", "")
+DB_PATH = os.getenv("EXPENSE_DB_PATH", os.path.join(BASE_DIR, "expenses.db"))
+
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
+
+# Лимит суммы расхода (защита от опечаток вроде /add 500000000)
+MAX_AMOUNT = float(os.getenv("MAX_AMOUNT", "1000000"))
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\db.py
+======================================================================
+"""SQLite-БД расходов (aiosqlite).
+
+Схема:
+  expenses(id INTEGER PK, user_id, amount REAL, category TEXT, note TEXT,
+           created_at TEXT)  — created_at = дата 'YYYY-MM-DD' (UTC)
+
+Агрегаты считаются SQL-запросами по диапазону дат (today/week/month) —
+продвинутый приём: никакой загрузки всех строк в память.
+"""
+from __future__ import annotations
+
+import csv
+from datetime import date
+
+import aiosqlite
+
+
+class Database:
+    def __init__(self, path: str) -> None:
+        self.path = path
+
+    async def init(self) -> None:
+        async with aiosqlite.connect(self.path) as db:
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS expenses (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id    INTEGER NOT NULL,
+                    amount     REAL NOT NULL,
+                    category   TEXT NOT NULL,
+                    note       TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            # Индекс: агрегаты идут по (user_id, created_at)
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_expenses_user_date "
+                "ON expenses (user_id, created_at)"
+            )
+            await db.commit()
+
+    async def add_expense(
+        self, user_id: int, amount: float, category: str, note: str, day: date | None = None
+    ) -> int:
+        async with aiosqlite.connect(self.path) as db:
+            cur = await db.execute(
+                "INSERT INTO expenses (user_id, amount, category, note, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (user_id, amount, category, note, (day or date.today()).isoformat()),
+            )
+            await db.commit()
+            return cur.lastrowid
+
+    async def total_between(self, user_id: int, start: date, end: date) -> float:
+        async with aiosqlite.connect(self.path) as db:
+            cur = await db.execute(
+                "SELECT COALESCE(SUM(amount), 0) FROM expenses "
+                "WHERE user_id = ? AND created_at BETWEEN ? AND ?",
+                (user_id, start.isoformat(), end.isoformat()),
+            )
+            row = await cur.fetchone()
+        return float(row[0])
+
+    async def by_category(self, user_id: int, start: date, end: date) -> dict[str, float]:
+        async with aiosqlite.connect(self.path) as db:
+            cur = await db.execute(
+                "SELECT category, SUM(amount) AS total FROM expenses "
+                "WHERE user_id = ? AND created_at BETWEEN ? AND ? "
+                "GROUP BY category ORDER BY total DESC",
+                (user_id, start.isoformat(), end.isoformat()),
+            )
+            rows = await cur.fetchall()
+        return {str(r[0]): float(r[1]) for r in rows}
+
+    async def recent(self, user_id: int, limit: int = 10) -> list[dict]:
+        async with aiosqlite.connect(self.path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT * FROM expenses WHERE user_id = ? ORDER BY id DESC LIMIT ?",
+                (user_id, limit),
+            )
+            rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+    async def export_csv(self, path: str, user_id: int, start: date, end: date) -> int:
+        """Выгружает расходы за период в CSV (utf-8-sig — открывается в Excel)."""
+        async with aiosqlite.connect(self.path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT created_at, category, amount, note FROM expenses "
+                "WHERE user_id = ? AND created_at BETWEEN ? AND ? "
+                "ORDER BY created_at",
+                (user_id, start.isoformat(), end.isoformat()),
+            )
+            rows = await cur.fetchall()
+        with open(path, "w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.writer(fh, delimiter=";")
+            writer.writerow(["date", "category", "amount", "note"])
+            for r in rows:
+                writer.writerow([r["created_at"], r["category"], r["amount"], r["note"]])
+        return len(rows)
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\middlewares.py
+======================================================================
+"""Middlewares: троттлинг и логирование (общий паттерн для всех ботов)."""
+from __future__ import annotations
+
+import logging
+import time
+from typing import Any, Awaitable, Callable
+
+from aiogram import BaseMiddleware
+from aiogram.types import Message, Update
+
+logger = logging.getLogger(__name__)
+
+
+class ThrottlingMiddleware(BaseMiddleware):
+    """Пропускает не чаще одного сообщения пользователя за min_interval сек.
+
+    Продвинутый приём: «burst» — если пользователь спамит, после короткой
+    паузы даём ему ответить ещё раз (иначе атака «замолчи навсегда»).
+    """
+
+    def __init__(self, min_interval: float = 0.7, burst: int = 5) -> None:
+        super().__init__()
+        self._min_interval = min_interval
+        self._burst = burst
+        self._last: dict[int, float] = {}
+        self._streak: dict[int, int] = {}
+
+    async def __call__(
+        self,
+        handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
+        message: Message,
+        data: dict[str, Any],
+    ) -> Any:
+        user_id = message.from_user.id if message.from_user else 0
+        now = time.monotonic()
+        last = self._last.get(user_id, 0.0)
+        if now - last < self._min_interval:
+            streak = self._streak.get(user_id, 0) + 1
+            self._streak[user_id] = streak
+            if streak <= self._burst:
+                # Во время «взрыва» пропускаем — живой пользователь, не бот
+                self._last[user_id] = now
+                return await handler(message, data)
+            return None  # явный дроп спама
+        self._last[user_id] = now
+        self._streak[user_id] = 0
+        return await handler(message, data)
+
+
+class LoggingMiddleware(BaseMiddleware):
+    """Пишет каждое входящее обновление в лог — полезно для отладки."""
+
+    async def __call__(
+        self,
+        handler: Callable[[Update, dict[str, Any]], Awaitable[Any]],
+        update: Update,
+        data: dict[str, Any],
+    ) -> Any:
+        logger.debug("Update: %s", update.model_dump(exclude_unset=True))
+        return await handler(update, data)
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\pyproject.toml
+======================================================================
+[project]
+name = "telegram-expense-tracker"
+version = "1.0.0"
+description = "Учёт расходов в Telegram: /add, категории, отчёты, экспорт CSV"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\requirements.txt
+======================================================================
+aiogram>=3.4,<4
+aiosqlite>=0.20
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\run_bot8.cmd
+======================================================================
+@echo off
+rem Launch script for Telegram Expense Tracker (Project 8).
+rem Reads TG_TOKEN from the root .env, sets EXPENSE_BOT_TOKEN, runs the bot.
+cd /d "%~dp0"
+
+for /f "usebackq tokens=1,* delims==" %%a in ("..\.env") do (
+    if "%%a"=="TG_TOKEN" set "EXPENSE_BOT_TOKEN=%%b"
+)
+if not defined EXPENSE_BOT_TOKEN (
+    echo [ERROR] TG_TOKEN not found in ..\.env
+    pause
+    exit /b 1
+)
+
+set "PYTHONIOENCODING=utf-8"
+
+..\.venv\Scripts\python.exe -u bot.py
+
+======================================================================
+ФАЙЛ: project8_telegram_expense_tracker\tests\test_expenses.py
+======================================================================
+"""Тесты Expense Tracker: парсинг /add, автокатегоризация, слой БД."""
+import asyncio
+import csv
+import os
+import sys
+from datetime import date
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from categories import FALLBACK_CATEGORY, categorize, parse_expense  # noqa: E402
+from db import Database  # noqa: E402
+
+
+# ------------------------------------------------------------- категории
+
+def test_parse_expense_basic():
+    parsed = parse_expense("500 кофе")
+    assert parsed is not None
+    amount, note, category = parsed
+    assert amount == 500.0
+    assert note == "кофе"
+    assert category == "Продукты"
+
+
+def test_parse_expense_comma_amount():
+    parsed = parse_expense("99,50 булочка")
+    assert parsed is not None
+    assert parsed[0] == 99.50
+
+
+def test_parse_expense_rejects_invalid():
+    assert parse_expense("") is None
+    assert parse_expense("abc") is None
+    assert parse_expense("-10 кофе") is None
+    assert parse_expense("0 кофе") is None
+    assert parse_expense("999999999999 машина") is None  # превышение лимита
+    assert parse_expense("500", max_amount=100) is None
+
+
+def test_parse_expense_without_note():
+    parsed = parse_expense("300")
+    assert parsed is not None
+    amount, note, category = parsed
+    assert amount == 300.0
+    assert note == ""
+    assert category == FALLBACK_CATEGORY
+
+
+def test_categorize_keywords_case_insensitive():
+    assert categorize("поездка на МЕТРО") == "Транспорт"
+    assert categorize("таблетки в аптеке") == "Здоровье"
+    assert categorize("аренда квартиры") == "Жильё"
+
+
+def test_categorize_fallback():
+    assert categorize("случайная покупка") == FALLBACK_CATEGORY
+
+
+# ------------------------------------------------------------------- БД
+
+def test_db_roundtrip_and_aggregates(tmp_path):
+    db_path = str(tmp_path / "expenses.db")
+
+    async def run():
+        db = Database(db_path)
+        await db.init()
+        user_id = 42
+        await db.add_expense(user_id, 200.0, "Продукты", "обед", day=date(2026, 7, 30))
+        await db.add_expense(user_id, 500.0, "Продукты", "кофе", day=date(2026, 8, 7))
+        await db.add_expense(user_id, 300.0, "Транспорт", "метро", day=date(2026, 8, 6))
+
+        assert await db.total_between(user_id, date(2026, 8, 1), date(2026, 8, 31)) == 800.0
+        assert await db.total_between(user_id, date(2026, 7, 1), date(2026, 7, 31)) == 200.0
+
+        by_cat = await db.by_category(user_id, date(2026, 8, 1), date(2026, 8, 31))
+        assert by_cat == {"Продукты": 500.0, "Транспорт": 300.0}
+
+        recent = await db.recent(user_id, limit=2)
+        assert len(recent) == 2
+        assert recent[0]["amount"] == 300.0  # последняя добавленная (id DESC) первая
+        assert recent[1]["amount"] == 500.0
+
+        # экспорт CSV
+        csv_path = str(tmp_path / "export.csv")
+        count = await db.export_csv(csv_path, user_id, date(2026, 8, 1), date(2026, 8, 31))
+        assert count == 2
+        with open(csv_path, newline="", encoding="utf-8-sig") as fh:
+            rows = list(csv.reader(fh, delimiter=";"))
+        assert rows[0] == ["date", "category", "amount", "note"]
+        assert len(rows) == 3  # шапка + 2 записи
+
+    asyncio.run(run())
+
+
+def test_db_empty_results(tmp_path):
+    db_path = str(tmp_path / "empty.db")
+
+    async def run():
+        db = Database(db_path)
+        await db.init()
+        assert await db.total_between(1, date(2026, 1, 1), date(2026, 1, 31)) == 0.0
+        assert await db.by_category(1, date(2026, 1, 1), date(2026, 1, 31)) == {}
+        assert await db.recent(1) == []
+
+    asyncio.run(run())
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\.dockerignore
+======================================================================
+.env
+*.db
+*.log
+__pycache__/
+.pytest_cache/
+.venv/
+tests/
+.git/
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\.env.example
+======================================================================
+# Telegram Bot токен (выдаёт @BotFather). ВАЖНО: никогда не коммитьте реальный токен!
+NEWS_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+
+# 0 = реальные RSS/Atom ленты (интернет) | 1 = демо-режим (оффлайн)
+# NEWS_DEMO_MODE=1
+
+# Путь к SQLite-БД
+# NEWS_DB_PATH=C:\data\news.db
+
+# Час ежедневного дайджеста
+# NEWS_DIGEST_HOUR=9
+
+# Сколько новостей показывать за раз
+# NEWS_MAX_ITEMS=5
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\.gitignore
+======================================================================
+.env
+*.db
+*.db-shm
+*.db-wal
+*.log
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\Dockerfile
+======================================================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# docker run -e NEWS_BOT_TOKEN=... -e NEWS_DEMO_MODE=1 ...
+CMD ["python", "bot.py"]
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\README.md
+======================================================================
+# Telegram News Bot 📰
+
+Новостной бот для Telegram: читает **RSS 2.0 и Atom** ленты, показывает свежие
+новости, запоминает уже виденные (дедупликация) и присылает ежедневный дайджест
+только из новых материалов. Парсер написан на стандартной библиотеке
+(`xml.etree`) — без сторонних RSS-библиотек.
+
+## Возможности
+
+| Команда | Описание |
+|---|---|
+| `/news [URL]` | Свежие новости (по умолчанию Lenta.ru; своя лента — по URL) |
+| `/sources` | Встроенные ленты: Lenta, Habr, BBC World, Коммерсантъ |
+| `/digest on\|off` | Ежедневный дайджест подписанной ленты в 9:00 |
+| `/latest` | Последние сохранённые новости из БД |
+| `/stats` | Сколько новостей обработано, число подписок |
+
+## Продвинутый уровень (v2)
+
+- **Единый парсер RSS и Atom** на stdlib: схема определяется по корневому тегу,
+  кодировки лент (включая windows-1251) читаются из байтов самим expat,
+  HTML-сущности разворачиваются (`html.unescape`), RFC-822 и ISO-8601 даты
+  приводятся к единому формату;
+- **Дедупликация по `UNIQUE(link)`** — одна новость никогда не придёт дважды,
+  даже если лента обновилась заново (`INSERT OR IGNORE`, возвращает число новых);
+- **TTL-кэш лент** (10 мин — типичный интервал обновления RSS);
+- **Устойчивость к «грязным» лентам** — парсер не падает на отсутствующих полях;
+- **Middlewares** — троттлинг и логирование;
+- **APScheduler cron** — дайджест шлёт только новые материалы.
+
+## Структура
+
+```
+telegram-news-bot/
+├── bot.py            # aiogram v3: команды, дайджест, сборка Dispatcher
+├── config.py         # переменные окружения + встроенные ленты
+├── rss_parser.py     # stdlib-парсер RSS/Atom + httpx-загрузчик + демо-пул
+├── db.py             # aiosqlite: дедупликация статей, подписки
+├── utils.py          # TTL-кэш, retry с джиттером (stdlib)
+├── middlewares.py    # троттлинг + логирование
+├── tests/            # unit-тесты парсинга (RSS/Atom/windows-1251) и БД
+├── requirements.txt
+├── pyproject.toml
+├── Dockerfile        # docker run -e NEWS_BOT_TOKEN=...
+├── .github/workflows/ci.yml  # CI: compileall + pytest на каждый push
+└── run_bot9.cmd      # запуск в Windows (читает TG_TOKEN из корневого .env)
+```
+
+## Запуск
+
+```bash
+pip install -r requirements.txt
+set NEWS_BOT_TOKEN=123456:ABC...
+set NEWS_DEMO_MODE=0      # 0 = реальные ленты, 1 = оффлайн-демо
+python bot.py
+```
+
+Или в Windows — двойной клик по `run_bot9.cmd` (токен берётся из `..\.env`).
+
+## Тесты
+
+```bash
+python -m pytest tests/ -q
+```
+
+Тесты покрывают: парсинг RSS 2.0, Atom, ленту в windows-1251, разворот
+HTML-сущностей, дедупликацию и подписки.
+
+## Docker
+
+```bash
+docker build -t telegram-news-bot .
+docker run -e NEWS_BOT_TOKEN=... -e NEWS_DEMO_MODE=0 telegram-news-bot
+```
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\bot.py
+======================================================================
+"""Telegram News Bot (aiogram v3 + stdlib RSS/Atom парсер + apscheduler).
+
+Стек: aiogram v3 (Telegram Bot API) + httpx (загрузка лент) +
+xml.etree из стандартной библиотеки (парсинг RSS 2.0 / Atom) +
+aiosqlite (дедупликация новостей, подписки) + APScheduler (ежедневный дайджест).
+
+Команды:
+  /news [URL]       — свежие новости (по умолчанию Lenta.ru)
+  /sources          — встроенные ленты (бесплатные, без ключа)
+  /digest on|off    — ежедневный дайджест подписанных лент (в 9:00)
+  /latest           — последние сохранённые новости из БД
+  /stats            — сколько новостей уже обработано
+
+Продвинутый уровень:
+  - единый парсер RSS и Atom на stdlib (кодировка из байтов, html.unescape);
+  - дедупликация по UNIQUE(link) — одна новость никогда не придёт дважды;
+  - TTL-кэш лент + retry с джиттером; middlewares: троттлинг и логирование.
+
+Запуск:  python bot.py   (задайте NEWS_BOT_TOKEN, или run_bot9.cmd).
+"""
+from __future__ import annotations
+
+import asyncio
+import html as _html
+import logging
+import os
+
+from aiogram import Bot, Dispatcher, Router
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.filters import Command, CommandStart
+from aiogram.types import Message
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+import config
+from db import Database
+from middlewares import LoggingMiddleware, ThrottlingMiddleware
+from rss_parser import FeedFetcher
+from utils import TTLCache
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(config.BASE_DIR, "bot.log"), encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
+
+router = Router()
+db = Database()
+fetcher = FeedFetcher()
+feed_cache = TTLCache(ttl_seconds=config.CACHE_TTL_SECONDS)
+
+_bot: Bot | None = None
+scheduler = AsyncIOScheduler()
+
+
+def _format_news(items: list, header: str = "") -> str:
+    lines = [f"📰 <b>{_html.escape(header)}</b>"] if header else []
+    for it in items:
+        date_part = f" · <i>{_html.escape(it.published)}</i>" if it.published else ""
+        lines.append(
+            f"• <a href=\"{_html.escape(it.link)}\">{_html.escape(it.title)}</a>{date_part}"
+        )
+    return "\n".join(lines) if lines else "Новостей пока нет."
+
+
+# ---------------------------------------------------------------- команды
+
+@router.message(CommandStart())
+async def cmd_start(message: Message) -> None:
+    await message.answer(
+        "📰 <b>Telegram News Bot</b>\n\n"
+        "/news — свежие новости (Lenta.ru)\n"
+        "/news https://…/rss.xml — своя RSS/Atom лента\n"
+        "/sources — встроенные ленты\n"
+        "/digest on — ежедневный дайджест (в 9:00)\n"
+        "/latest — последние сохранённые\n\n"
+        f"Источник: <b>{'демо-данные' if fetcher.demo_mode else 'RSS/Atom-ленты'}</b>"
+    )
+
+
+@router.message(Command("news"))
+async def cmd_news(message: Message) -> None:
+    args = message.text.split(maxsplit=1)
+    url = (args[1] if len(args) > 1 else config.DEFAULT_FEED_URL).strip()
+    source = next((f["name"] for f in config.DEFAULT_FEEDS if f["url"] == url), url)
+    status = await message.answer("Загружаю ленту…")
+    try:
+        items = await feed_cache.get_or_set(url, lambda: fetcher.fetch(url, source))
+    except Exception as exc:
+        logger.exception("Ошибка загрузки ленты %s", url)
+        await status.edit_text(f"⚠️ Не удалось загрузить ленту: {exc}")
+        return
+    shown = items[: config.MAX_ITEMS]
+    new_items = await db.save_articles(shown)
+    text = _format_news(shown, header=f"{source}: {len(shown)} свежих")
+    text += f"\n\n<i>Из них новых для дайджеста: {len(new_items)}</i>"
+    await status.edit_text(text, disable_web_page_preview=True)
+
+
+@router.message(Command("sources"))
+async def cmd_sources(message: Message) -> None:
+    lines = ["🗂 <b>Встроенные ленты</b>\n"]
+    lines += [f"• {_html.escape(f['name'])} — <code>{_html.escape(f['url'])}</code>" for f in config.DEFAULT_FEEDS]
+    lines.append("\nСвоя лента: <code>/news https://…/rss.xml</code>")
+    await message.answer("\n".join(lines))
+
+
+@router.message(Command("digest"))
+async def cmd_digest(message: Message) -> None:
+    args = message.text.split()
+    if len(args) < 2 or args[1].lower() not in ("on", "off"):
+        await message.answer("Использование: /digest on  или  /digest off")
+        return
+    on = args[1].lower() == "on"
+    feed_url = config.DEFAULT_FEED_URL
+    if on:
+        ok = await db.subscribe(
+            message.from_user.id, feed_url,
+            feed_name=next(f["name"] for f in config.DEFAULT_FEEDS if f["url"] == feed_url),
+        )
+        if not ok:
+            await message.answer("Вы уже подписаны на дайджест.")
+            return
+    else:
+        await db.unsubscribe(message.from_user.id, feed_url)
+    await message.answer(
+        f"📬 Дайджест <b>{'включён' if on else 'выключен'}</b> "
+        f"(каждый день в {config.DIGEST_HOUR}:00, только новые новости)."
+    )
+
+
+@router.message(Command("latest"))
+async def cmd_latest(message: Message) -> None:
+    rows = await db.latest(limit=10)
+    if not rows:
+        await message.answer("Новостей пока не сохранено. Запросите /news.")
+        return
+    items = [
+        f"• <a href=\"{_html.escape(r['link'])}\">{_html.escape(r['title'])}</a>"
+        for r in rows
+    ]
+    await message.answer("🗃 <b>Последние сохранённые</b>\n" + "\n".join(items),
+                         disable_web_page_preview=True)
+
+
+@router.message(Command("stats"))
+async def cmd_stats(message: Message) -> None:
+    total = await db.total_articles()
+    subs = await db.all_subscriptions()
+    await message.answer(
+        f"📊 <b>Статистика</b>\n"
+        f"• Обработано новостей: <b>{total}</b>\n"
+        f"• Подписок на дайджест: <b>{len(subs)}</b>\n"
+        f"• Режим: <b>{'демо' if fetcher.demo_mode else 'реальные ленты'}</b>"
+    )
+
+
+# ------------------------------------------------------- ежедневный дайджест
+
+async def _digest_job() -> None:
+    """Отправляет подписчикам только НОВЫЕ новости (дедупликация по link)."""
+    if _bot is None:
+        return
+    subs = await db.all_subscriptions()
+    for sub in subs:
+        try:
+            items = await fetcher.fetch(sub["feed_url"], sub["feed_name"])
+        except Exception:
+            logger.exception("Дайджест: ошибка ленты %s", sub["feed_url"])
+            continue
+        # save_articles возвращает только вновь добавленные
+        new_items = await db.save_articles(items)
+        if new_items:
+            
+            text = _format_news(new_items[: config.MAX_ITEMS], header=f"{sub['feed_name']}: {len(new_items)} новых")
+            await _bot.send_message(sub["user_id"], text, disable_web_page_preview=True)
+        await asyncio.sleep(0.3)
+
+
+async def main() -> None:
+    global _bot
+    if not config.BOT_TOKEN:
+        raise SystemExit("Не задан NEWS_BOT_TOKEN. Скопируйте .env.example и задайте токен.")
+    _bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    dp = Dispatcher()
+    dp.include_router(router)
+    dp.message.middleware(ThrottlingMiddleware(min_interval=config.THROTTLE_MIN_INTERVAL))
+    dp.update.middleware(LoggingMiddleware())
+    await db.init()
+    scheduler.add_job(_digest_job, "cron", hour=config.DIGEST_HOUR, minute=0)
+    scheduler.start()
+    logger.info(
+        "Новостной бот запущен. Режим: %s",
+        "демо-данные" if fetcher.demo_mode else "RSS/Atom-ленты",
+    )
+    try:
+        await dp.start_polling(_bot)
+    finally:
+        await _bot.session.close()
+        scheduler.shutdown(wait=False)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\config.py
+======================================================================
+"""Конфигурация Telegram News Bot через переменные окружения."""
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+BOT_TOKEN = os.getenv("NEWS_BOT_TOKEN", "")
+DB_PATH = os.getenv("NEWS_DB_PATH", os.path.join(BASE_DIR, "news.db"))
+
+# 1 = демо-режим (оффлайн-новости, сеть не нужна) | 0 = реальные RSS/Atom ленты
+DEMO_MODE = os.getenv("NEWS_DEMO_MODE", "1") == "1"
+
+# Встроенные ленты (бесплатные, без ключа). Формат: название | URL
+DEFAULT_FEEDS = [
+    {"name": "Lenta.ru", "url": "https://lenta.ru/rss"},
+    {"name": "Habr (всё)", "url": "https://habr.com/ru/rss/all/"},
+    {"name": "BBC World", "url": "http://feeds.bbci.co.uk/news/world/rss.xml"},
+    {"name": "Коммерсантъ", "url": "https://www.kommersant.ru/RSS/news.xml"},
+]
+
+# Лента по умолчанию (если пользователь не выбрал свою)
+DEFAULT_FEED_URL = DEFAULT_FEEDS[0]["url"]
+
+RSS_TIMEOUT = float(os.getenv("NEWS_RSS_TIMEOUT", "10"))
+MAX_ITEMS = int(os.getenv("NEWS_MAX_ITEMS", "5"))
+
+# Час ежедневного дайджеста (локальное время)
+DIGEST_HOUR = int(os.getenv("NEWS_DIGEST_HOUR", "9"))
+
+# --- Продвинутый уровень ---
+# TTL кэша ленты (секунды): RSS-ленты обновляются раз в 10–30 минут
+CACHE_TTL_SECONDS = float(os.getenv("NEWS_CACHE_TTL_SECONDS", "600"))
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\db.py
+======================================================================
+"""SQLite-БД новостного бота (aiosqlite).
+
+Схема:
+  articles(id PK, title, link UNIQUE, published, source, created_at)
+      — link UNIQUE = дедупликация: одна и та же новость не попадёт
+        в дайджест дважды, даже если лента обновилась заново.
+  subscriptions(user_id, feed_url, feed_name, UNIQUE(user_id, feed_url))
+      — подписки на ежедневный дайджест.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+import aiosqlite
+
+import config
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+class Database:
+    def __init__(self, path: str = config.DB_PATH) -> None:
+        self.path = path
+
+    async def init(self) -> None:
+        async with aiosqlite.connect(self.path) as db:
+            await db.execute(
+                "CREATE TABLE IF NOT EXISTS articles ("
+                " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                " title TEXT NOT NULL,"
+                " link TEXT NOT NULL UNIQUE,"
+                " published TEXT NOT NULL DEFAULT '',"
+                " source TEXT NOT NULL DEFAULT '',"
+                " created_at TEXT NOT NULL)"
+            )
+            await db.execute(
+                "CREATE TABLE IF NOT EXISTS subscriptions ("
+                " user_id INTEGER NOT NULL,"
+                " feed_url TEXT NOT NULL,"
+                " feed_name TEXT NOT NULL DEFAULT '',"
+                " UNIQUE(user_id, feed_url))"
+            )
+            await db.commit()
+
+    async def save_articles(self, items: list) -> list:
+        """INSERT OR IGNORE — вставляет только новые.
+
+        Возвращает список ТОЛЬКО вновь добавленных элементов (в порядке
+        исходного списка) — по нему рассылается дайджест: старые новости,
+        уже бывшие в БД, в него не попадут.
+        """
+        inserted: list = []
+        async with aiosqlite.connect(self.path) as db:
+            for it in items:
+                cur = await db.execute(
+                    "INSERT OR IGNORE INTO articles (title, link, published, source, created_at) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (it.title, it.link, it.published, it.source, _now()),
+                )
+                if cur.rowcount > 0:
+                    inserted.append(it)
+            await db.commit()
+        return inserted
+
+    async def latest(self, limit: int = 10) -> list[dict]:
+        async with aiosqlite.connect(self.path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT * FROM articles ORDER BY id DESC LIMIT ?", (limit,)
+            )
+            rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+    async def total_articles(self) -> int:
+        async with aiosqlite.connect(self.path) as db:
+            cur = await db.execute("SELECT COUNT(*) FROM articles")
+            row = await cur.fetchone()
+        return int(row[0])
+
+    # -------------------------------------------------------- подписки
+
+    async def subscribe(self, user_id: int, feed_url: str, feed_name: str = "") -> bool:
+        async with aiosqlite.connect(self.path) as db:
+            cur = await db.execute(
+                "INSERT OR IGNORE INTO subscriptions (user_id, feed_url, feed_name) "
+                "VALUES (?, ?, ?)",
+                (user_id, feed_url, feed_name),
+            )
+            await db.commit()
+            return cur.rowcount > 0
+
+    async def unsubscribe(self, user_id: int, feed_url: str) -> bool:
+        async with aiosqlite.connect(self.path) as db:
+            cur = await db.execute(
+                "DELETE FROM subscriptions WHERE user_id = ? AND feed_url = ?",
+                (user_id, feed_url),
+            )
+            await db.commit()
+            return cur.rowcount > 0
+
+    async def user_subscriptions(self, user_id: int) -> list[dict]:
+        async with aiosqlite.connect(self.path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT feed_url, feed_name FROM subscriptions WHERE user_id = ? ORDER BY feed_name",
+                (user_id,),
+            )
+            rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+    async def all_subscriptions(self) -> list[dict]:
+        async with aiosqlite.connect(self.path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM subscriptions ORDER BY user_id")
+            rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\middlewares.py
+======================================================================
+"""Middlewares: троттлинг и логирование (общий паттерн для всех ботов)."""
+from __future__ import annotations
+
+import logging
+import time
+from typing import Any, Awaitable, Callable
+
+from aiogram import BaseMiddleware
+from aiogram.types import Message, Update
+
+logger = logging.getLogger(__name__)
+
+
+class ThrottlingMiddleware(BaseMiddleware):
+    """Пропускает не чаще одного сообщения пользователя за min_interval сек.
+
+    Продвинутый приём: «burst» — если пользователь спамит, после короткой
+    паузы даём ему ответить ещё раз (иначе атака «замолчи навсегда»).
+    """
+
+    def __init__(self, min_interval: float = 0.7, burst: int = 5) -> None:
+        super().__init__()
+        self._min_interval = min_interval
+        self._burst = burst
+        self._last: dict[int, float] = {}
+        self._streak: dict[int, int] = {}
+
+    async def __call__(
+        self,
+        handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
+        message: Message,
+        data: dict[str, Any],
+    ) -> Any:
+        user_id = message.from_user.id if message.from_user else 0
+        now = time.monotonic()
+        last = self._last.get(user_id, 0.0)
+        if now - last < self._min_interval:
+            streak = self._streak.get(user_id, 0) + 1
+            self._streak[user_id] = streak
+            if streak <= self._burst:
+                self._last[user_id] = now
+                return await handler(message, data)
+            return None  # явный дроп спама
+        self._last[user_id] = now
+        self._streak[user_id] = 0
+        return await handler(message, data)
+
+
+class LoggingMiddleware(BaseMiddleware):
+    """Пишет каждое входящее обновление в лог — полезно для отладки."""
+
+    async def __call__(
+        self,
+        handler: Callable[[Update, dict[str, Any]], Awaitable[Any]],
+        update: Update,
+        data: dict[str, Any],
+    ) -> Any:
+        logger.debug("Update: %s", update.model_dump(exclude_unset=True))
+        return await handler(update, data)
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\pyproject.toml
+======================================================================
+[project]
+name = "telegram-news-bot"
+version = "1.0.0"
+description = "Новости в Telegram: RSS/Atom парсер на stdlib + дедупликация + дайджест"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\requirements.txt
+======================================================================
+aiogram>=3.4,<4
+aiosqlite>=0.20
+httpx>=0.27
+pydantic>=2.0
+APScheduler>=3.10,<4
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\rss_parser.py
+======================================================================
+"""RSS/Atom парсер на чистом stdlib (xml.etree) + httpx-клиент.
+
+Поддерживает обе основные схемы:
+  - RSS 2.0:  <rss><channel><item><title>/<link>/<pubDate>…
+  - Atom:     <feed><entry><title>/<link href=…>/<updated>…
+
+Продвинутый уровень:
+  - namespace-агностичный поиск: ищем элементы по ЛОКАЛЬНОМУ имени
+    (без «{http://…}» и префиксов вроде «dc:»), поэтому ленты с любыми
+    пространствами имён и без них парсятся одинаково;
+  - устойчивость к кодировкам: expat сам читает кодировку из байтов
+    (RSS бывает windows-1251, iso-8859-1 и пр.);
+  - единый парсер RSS и Atom — схема определяется по корневому тегу;
+  - демо-режим с оффлайн-пулом новостей (тесты и запуск без сети);
+  - pydantic-модель NewsItem (валидация полей).
+"""
+from __future__ import annotations
+
+import html as _html
+import random
+import xml.etree.ElementTree as ET
+from datetime import datetime
+
+import httpx
+from pydantic import BaseModel
+
+import config
+
+# Оффлайн-пул «новостей» для демо-режима и фолбэка
+DEMO_POOL = [
+    ("Курс доллара снизился на фоне роста нефтяных котировок", "https://demo.example/1"),
+    ("В столице открылась новая линия метро", "https://demo.example/2"),
+    ("Учёные представили прорыв в возобновляемой энергетике", "https://demo.example/3"),
+    ("ИИ-ассистенты стали писать половину кода в крупных IT-компаниях", "https://demo.example/4"),
+    ("Стартап собрал рекордный раунд инвестиций", "https://demo.example/5"),
+    ("Анонсирован новый стандарт быстрой зарядки", "https://demo.example/6"),
+]
+
+
+class NewsItem(BaseModel):
+    """Одна новость: заголовок, ссылка, дата, название источника."""
+
+    title: str
+    link: str
+    published: str = ""  # ISO-строка; пусто, если даты нет в ленте
+    source: str = ""
+
+
+# ------------------------------------------------------- namespace-утилиты
+
+
+def _local_name(tag: str) -> str:
+    """Локальное имя тега без namespace и префикса.
+
+    '{http://www.w3.org/2005/Atom}entry' -> 'entry'
+    'dc:date'                            -> 'date'
+    'pubDate'                            -> 'pubDate'
+    """
+    if not isinstance(tag, str):
+        return ""
+    return tag.rsplit("}", 1)[-1].rsplit(":", 1)[-1]
+
+
+def _iter_elements(root: ET.Element, local_name: str) -> list[ET.Element]:
+    """Все потомки с данным локальным именем (namespace-агностично)."""
+    return [el for el in root.iter() if _local_name(el.tag) == local_name]
+
+
+def _first_text(element: ET.Element, *names: str) -> str:
+    """Первое непустое текстовое значение среди локальных имён names."""
+    wanted = {_local_name(n) for n in names}
+    for el in element.iter():
+        if _local_name(el.tag) in wanted and el.text and el.text.strip():
+            return _html.unescape(el.text.strip())
+    return ""
+
+
+def _parse_date(value: str) -> str:
+    """RFC-822 (RSS) и ISO-8601 (Atom) → единый ISO-формат; пусто при ошибке.
+
+    RFC-822: 'Tue, 05 Aug 2026 10:00:00 +0300' — у публикаторов бывают разные
+    локальные форматы, поэтому пробуем основные варианты и отдаём как есть,
+    если не вышло (лента — источник ненадёжный, бот не должен падать).
+    """
+    value = (value or "").strip()
+    if not value:
+        return ""
+    for fmt in ("%a, %d %b %Y %H:%M:%S %z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ"):
+        try:
+            dt = datetime.strptime(value, fmt)
+            return dt.isoformat(timespec="seconds")
+        except ValueError:
+            continue
+    return value
+
+
+def parse_feed(xml_bytes: bytes, source: str = "") -> list[NewsItem]:
+    """Разбирает RSS 2.0 или Atom из байтов в список NewsItem.
+
+    Байты (а не str) — чтобы expat сам применил кодировку из декларации.
+    """
+    root = ET.fromstring(xml_bytes)
+    tag = _local_name(root.tag).lower()
+    items: list[NewsItem] = []
+
+    if tag in ("rss", "rdf"):
+        # RSS 2.0 / RDF: элементы внутри channel/item
+        for item in _iter_elements(root, "item"):
+            title = _first_text(item, "title")
+            link = _first_text(item, "link")
+            published = _parse_date(_first_text(item, "pubDate", "dc:date"))
+            if title and link:
+                items.append(NewsItem(title=title, link=link, published=published, source=source))
+    elif tag == "feed":
+        # Atom: <entry><title>/<link href>/<updated>
+        for entry in _iter_elements(root, "entry"):
+            title = _first_text(entry, "title")
+            link = ""
+            for el in _iter_elements(entry, "link"):
+                href = el.get("href")
+                if href:
+                    link = href.strip()
+                    break
+            published = _parse_date(_first_text(entry, "updated", "published"))
+            if title and link:
+                items.append(NewsItem(title=title, link=link, published=published, source=source))
+    return items
+
+
+def demo_feed(source: str = "Демо-лента", amount: int = 5) -> list[NewsItem]:
+    """Оффлайн-«лента» из демо-пула (перемешанная выборка)."""
+    return [
+        NewsItem(title=t, link=l, source=source)
+        for t, l in random.sample(DEMO_POOL, k=min(amount, len(DEMO_POOL)))
+    ]
+
+
+class FeedFetcher:
+    """Загрузчик ленты: httpx + raise_for_status; демо-режим — без сети."""
+
+    def __init__(self, timeout: float = config.RSS_TIMEOUT) -> None:
+        self.timeout = timeout
+        self.demo_mode = config.DEMO_MODE
+
+    async def fetch(self, url: str, source: str = "") -> list[NewsItem]:
+        if self.demo_mode:
+            return demo_feed(source or url)
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.get(url, headers={"User-Agent": "telegram-news-bot/1.0"})
+            resp.raise_for_status()
+        return parse_feed(resp.content, source or url)
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\run_bot9.cmd
+======================================================================
+@echo off
+rem Launch script for Telegram News Bot (Project 9).
+rem Reads TG_TOKEN from the root .env, sets NEWS_BOT_TOKEN, runs the bot.
+cd /d "%~dp0"
+
+for /f "usebackq tokens=1,* delims==" %%a in ("..\.env") do (
+    if "%%a"=="TG_TOKEN" set "NEWS_BOT_TOKEN=%%b"
+)
+if not defined NEWS_BOT_TOKEN (
+    echo [ERROR] TG_TOKEN not found in ..\.env
+    pause
+    exit /b 1
+)
+
+rem 0 = real RSS/Atom feeds (needs internet) | 1 = demo mode (offline)
+set "NEWS_DEMO_MODE=1"
+set "PYTHONIOENCODING=utf-8"
+
+..\.venv\Scripts\python.exe -u bot.py
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\tests\test_rss.py
+======================================================================
+"""Тесты News Bot: парсинг RSS/Atom, дедупликация, подписки."""
+import asyncio
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from db import Database  # noqa: E402
+from rss_parser import NewsItem, demo_feed, parse_feed  # noqa: E402
+
+# Кириллица в XML: литерал должен быть str (bytes-литералы в Python 3.13
+# не допускают не-ASCII), а в parse_feed передаём закодированные байты.
+RSS_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>Test</title>
+  <item><title>Первая новость</title><link>https://x.test/1</link>
+    <pubDate>Tue, 05 Aug 2026 10:00:00 +0300</pubDate></item>
+  <item><title>Вторая &amp; новость</title><link>https://x.test/2</link></item>
+</channel></rss>""".encode("utf-8")
+
+ATOM_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Atom feed</title>
+  <entry><title>Atom-новость</title>
+    <link href="https://x.test/atom"/><updated>2026-08-05T09:00:00Z</updated></entry>
+</feed>""".encode("utf-8")
+
+RSS_1251 = (
+    "<?xml version='1.0' encoding='windows-1251'?><rss version='2.0'><channel>"
+    "<title>Лента</title><item><title>Новость на русском</title>"
+    "<link>https://x.test/rus</link></item></channel></rss>"
+).encode("windows-1251")
+
+
+# ------------------------------------------------------------ парсинг RSS
+
+def test_parse_rss_items():
+    items = parse_feed(RSS_XML, source="Test")
+    assert len(items) == 2
+    assert items[0].title == "Первая новость"
+    assert items[0].link == "https://x.test/1"
+    assert items[0].published  # RFC-822 дата разобрана
+
+
+def test_parse_rss_unescapes_html_entities():
+    items = parse_feed(RSS_XML)
+    assert items[1].title == "Вторая & новость"
+
+
+def test_parse_atom():
+    items = parse_feed(ATOM_XML, source="Atom feed")
+    assert len(items) == 1
+    assert items[0].title == "Atom-новость"
+    assert items[0].link == "https://x.test/atom"
+    assert items[0].published.startswith("2026-08-05")
+
+
+def test_parse_windows_1251():
+    """Ленты в windows-1251 разбираются из байтов (expat сам читает кодировку)."""
+    items = parse_feed(RSS_1251)
+    assert len(items) == 1
+    assert items[0].title == "Новость на русском"
+
+
+def test_demo_feed_shape():
+    items = demo_feed("Демо", amount=3)
+    assert len(items) == 3
+    assert all(isinstance(i, NewsItem) for i in items)
+    assert all(i.title and i.link for i in items)
+
+
+# --------------------------------------------------- БД: дедуп и подписки
+
+def test_db_dedup_and_subscriptions(tmp_path):
+    db_path = str(tmp_path / "news.db")
+
+    async def run():
+        db = Database(db_path)
+        await db.init()
+
+        # дедупликация: повторное сохранение той же новости = 0 новых
+        items = [NewsItem(title="A", link="https://x/1"), NewsItem(title="B", link="https://x/2")]
+        first = await db.save_articles(items)
+        assert len(first) == 2 and first[0].link == "https://x/1"
+        assert await db.save_articles(items) == []  # новые не вернулись
+        assert await db.total_articles() == 2
+
+        latest = await db.latest(limit=5)
+        assert latest[0]["title"] == "B"  # свежайшая первой
+
+        # подписки
+        assert await db.subscribe(42, "https://feed.test/rss", "Test Feed") is True
+        assert await db.subscribe(42, "https://feed.test/rss", "Test Feed") is False  # дубль
+        assert len(await db.user_subscriptions(42)) == 1
+        assert await db.unsubscribe(42, "https://feed.test/rss") is True
+        assert await db.user_subscriptions(42) == []
+
+        assert await db.all_subscriptions() == []
+
+    asyncio.run(run())
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\utils.py
+======================================================================
+"""Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером."""
+from __future__ import annotations
+
+import asyncio
+import functools
+import logging
+import random
+import time
+from typing import Any, Awaitable, Callable, TypeVar
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+class TTLCache:
+    """TTL-кэш: значение живёт ttl секунд после записи."""
+
+    def __init__(self, ttl_seconds: float = 600.0) -> None:
+        self._ttl = ttl_seconds
+        self._store: dict[Any, tuple[float, Any]] = {}
+
+    def get(self, key: Any) -> Any | None:
+        item = self._store.get(key)
+        if item is None:
+            return None
+        expires, value = item
+        if time.monotonic() > expires:
+            self._store.pop(key, None)
+            return None
+        return value
+
+    async def get_or_set(self, key: Any, factory: Callable[[], Awaitable[T]]) -> T:
+        cached = self.get(key)
+        if cached is not None:
+            return cached
+        value = await factory()
+        self._store[key] = (time.monotonic() + self._ttl, value)
+        return value
+
+    def invalidate(self, key: Any | None = None) -> None:
+        if key is None:
+            self._store.clear()
+        else:
+            self._store.pop(key, None)
+
+    @property
+    def size(self) -> int:
+        return len(self._store)
+
+
+def backoff(attempt: int, base: float = 0.5, max_delay: float = 10.0, jitter: float = 0.3) -> float:
+    """Экспоненциальный backoff с джиттером: base * 2^(attempt-1), ±jitter%."""
+    delay = min(base * (2 ** (attempt - 1)), max_delay)
+    return delay * (1 + random.uniform(-jitter, jitter))
+
+
+def async_retry(
+    retries: int = 3,
+    base: float = 0.5,
+    retry_on: tuple[type[Exception], ...] = (Exception,),
+):
+    """Декоратор для асинхронных функций: повторы с экспоненциальным backoff."""
+
+    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+        @functools.wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> T:
+            last: Exception | None = None
+            for attempt in range(1, retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except retry_on as exc:
+                    last = exc
+                    if attempt == retries:
+                        break
+                    await asyncio.sleep(backoff(attempt, base=base))
+            assert last is not None
+            raise last
+
+        return wrapper
+
+    return decorator
