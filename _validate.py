@@ -10,6 +10,7 @@ import asyncio
 import os
 import sys
 import tempfile
+from datetime import datetime, timezone
 
 PROJECTS = {
     "p1": "project1_wb_price_tracker",
@@ -21,6 +22,8 @@ PROJECTS = {
     "p7": "project7_telegram_weather_bot",
     "p8": "project8_telegram_expense_tracker",
     "p9": "project9_telegram_news_bot",
+    "p10": "project10_ozon_price_tracker",
+    "p11": "project11_marketplace_compare",
 }
 
 
@@ -293,6 +296,92 @@ def validate_p9() -> None:
     print("  [OK] RSS parsing + demo feed + dedup (UNIQUE link) + subscriptions")
 
 
+def validate_p10() -> None:
+    """Ozon-трекер: парсинг ссылок, парсер виджетов, БД, логика алертов."""
+    _insert("p10")
+    from alerts import should_notify
+    from db import Database
+    from ozon_api import MockOzonClient, extract_product, parse_product_url
+
+    import json
+    assert parse_product_url("https://www.ozon.ru/product/name-1500516648/") == 1500516648
+    assert parse_product_url("1500516648") == 1500516648
+    assert parse_product_url("не ссылка") is None
+    payload = json.dumps({
+        "widgetStates": {
+            "webProductPage1": json.dumps({
+                "product": {
+                    "id": 1500516648,
+                    "title": "Смартфон",
+                    "price": {"price": "6990.00", "oldPrice": "9990.00"},
+                    "stockCount": 12,
+                }
+            })
+        }
+    })
+    product = extract_product(json.loads(payload))
+    assert product is not None and product["price"] == 6990 and product["stock"] == 12
+
+    async def run() -> None:
+        db = Database(os.path.join(tempfile.gettempdir(), "smoke_ozon.db"))
+        if os.path.exists(db.path):
+            os.remove(db.path)
+        await db.init()
+        card = await MockOzonClient().get_product(1500516648)
+        await db.upsert_item(card)
+        await db.track(111, 1500516648)
+        assert await db.list_tracked(111)
+        assert await db.history(1500516648)
+        assert await db.all_tracked_ids() == [1500516648]
+        await db.set_threshold(111, 1500516648, 5000)
+        assert await db.get_threshold(111, 1500516648) == 5000
+
+    asyncio.run(run())
+
+    now = datetime.now(timezone.utc)
+    notify, msgs = should_notify(5990, 5, 6990, 0, None, now=now)
+    assert notify and any("упала" in m for m in msgs)
+    assert any("снова в наличии" in m for m in msgs)
+    print("  [OK] парсинг ссылок + widgetStates + БД + mock-клиент + алерты")
+
+
+def validate_p11() -> None:
+    """Компаратор маркетплейсов: парсеры WB/Ozon, компаратор, БД подписок."""
+    _insert("p11")
+    from adapters import MockOzonAdapter, MockWbAdapter
+    from comparator import best_deal, merge_results
+    from db import Database
+    from models import Product
+
+    wb = MockWbAdapter()
+    oz = MockOzonAdapter()
+
+    async def run() -> None:
+        wb_products = await wb.search("смартфон", limit=3)
+        oz_products = await oz.search("смартфон", limit=3)
+        assert len(wb_products) == 3 and len(oz_products) == 3
+        merged = merge_results(wb_products, oz_products)
+        assert len(merged) == 6
+        assert merged[0].price <= merged[-1].price
+        best = best_deal(merged)
+        assert best is not None and best.price == min(p.price for p in merged)
+
+        db = Database(os.path.join(tempfile.gettempdir(), "smoke_market.db"))
+        if os.path.exists(db.path):
+            os.remove(db.path)
+        await db.init()
+        wid = await db.add_watch(111, "наушники", 3000)
+        await db.save_check(wid, 2500, "ozon")
+        await db.update_last_notified(wid, 2500)
+        watch = await db.get_watch(wid)
+        assert watch["last_best_price"] == 2500
+        assert len(await db.history(wid)) == 1
+        assert await db.delete_watch(111, wid) is True
+
+    asyncio.run(run())
+    print("  [OK] парсеры WB/Ozon (mock) + компаратор + watch-подписки в БД")
+
+
 def main() -> None:
     target = sys.argv[1] if len(sys.argv) > 1 else "all"
     checks = {
@@ -305,6 +394,8 @@ def main() -> None:
         "p7": validate_p7,
         "p8": validate_p8,
         "p9": validate_p9,
+        "p10": validate_p10,
+        "p11": validate_p11,
     }
     to_run = list(checks) if target == "all" else [target]
     for key in to_run:
