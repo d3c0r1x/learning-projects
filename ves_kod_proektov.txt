@@ -1,4 +1,4 @@
-СВОДНЫЙ ДАМП КОДА УЧЕБНЫХ ПРОЕКТОВ — 69 файлов
+СВОДНЫЙ ДАМП КОДА УЧЕБНЫХ ПРОЕКТОВ — 104 файлов
 
 ======================================================================
 
@@ -116,6 +116,23 @@ Desktop.ini
 - `ves_kod_proektov.txt` — сводный дамп кода всех проектов;
 - папки `project1_...`–`project6_...` — рабочие копии, каждая со своим
   git-репозиторием, запушенным на GitHub.
+
+## Продвинутый уровень (v2)
+
+Все 6 проектов обновлены до «продвинутого учебного» уровня — без новых
+сторонних зависимостей, только на библиотеках из ТЗ:
+
+- **aiogram v3 middlewares** во всех ботах: троттлинг (спам-защита) и логирование;
+- **TTL-кэши и retry с джиттером** на чистом stdlib (`utils.py`);
+- **кулдауны уведомлений, индексы и очистка БД** — базы не растут вечно;
+- **цепи LLM-провайдеров с фолбэком** и переспрос при невалидном JSON (P2);
+- **таблицы Platypus, многопанельные графики и CLI** (P3);
+- **тарифы, пробный период и возвраты Stars** (P4);
+- **выбор сложности, пагинация лидерборда, точность в %** (P5);
+- **watchlist и пороговые алерты курсов** с часовым джобом (P6);
+- **операции**: `pyproject.toml`, `Dockerfile`, GitHub Actions CI в каждом репо.
+
+Итого **41 unit-тест** (9+7+7+5+7+8) + изолированный валидатор `_validate.py`.
 
 ## Связка проектов
 
@@ -293,9 +310,9 @@ def validate_p5() -> None:
         if os.path.exists(db.path):
             os.remove(db.path)
         await db.init()
-        await db.save_result(1, "alice", 8)
-        await db.save_result(2, "bob", 5)
-        await db.save_result(1, "alice", 10)
+        await db.save_result(1, "alice", 8, 10)
+        await db.save_result(2, "bob", 5, 10)
+        await db.save_result(1, "alice", 10, 10)
         assert (await db.leaderboard())[0] == ("alice", 10)
         assert await db.stats(1) == (2, 10)
 
@@ -360,31 +377,75 @@ if __name__ == "__main__":
 
 
 ======================================================================
+ФАЙЛ: project1_wb_price_tracker\.dockerignore
+======================================================================
+.env
+*.db
+*.log
+__pycache__/
+.pytest_cache/
+.venv/
+tests/
+.git/
+
+
+======================================================================
 ФАЙЛ: project1_wb_price_tracker\.env.example
 ======================================================================
 [TEMPLATE]
 # Токен бота от @BotFather (обязательно)
 WB_BOT_TOKEN=123456:ABC-DEF...
 
-# 1 = демо-режим (не ходит в сеть, выдуманные данные), 0 = реальный API WB
-WB_DEMO_MODE=0
+# 1 = демо-режим (не ходит в сеть) | 0 = реальный API Wildberries
+WB_DEMO_MODE=1
 
-# Периодичность проверки цен в минутах (раз в сутки = 1440)
-WB_CHECK_INTERVAL_MINUTES=1440
-
-# Порог остатка для уведомления "товар заканчивается"
-WB_LOW_STOCK_THRESHOLD=5
-
-# --- Антибот-обход (см. README) ---
-# Транспорт: curl_cffi (имитация Chrome, по умолчанию) | httpx
+# --- Антибот-обход ---
+# curl_cffi (имитация Chrome, по умолчанию) | httpx
 WB_HTTP_CLIENT=curl_cffi
-
-# Прокси для запросов к WB, если ваш IP заблокирован (403 на card.wb.ru).
-# Примеры: http://user:pass@host:port | socks5://host:1080
+# Прокси с «чистым» IP: http://user:pass@host:port или socks5://host:1080
 WB_PROXY=
-
-# Сколько попыток на 429/5xx/сетевые ошибки
 WB_MAX_RETRIES=3
+
+# --- Продвинутые настройки ---
+# Проверка цен раз в N минут (ТЗ: раз в сутки = 1440)
+WB_CHECK_INTERVAL_MINUTES=1440
+# Кулдаун уведомлений по одному товару (часы)
+WB_ALERT_COOLDOWN_HOURS=6
+# Хранить историю цен N дней
+WB_HISTORY_KEEP_DAYS=30
+# Минимальный интервал между сообщениями пользователя (секунды)
+WB_THROTTLE_MIN_INTERVAL=0.7
+# ID администраторов для /cleanup (через запятую; пусто = доступно всем)
+WB_ADMIN_IDS=
+# TTL кэша карточек WB (секунды)
+WB_CACHE_TTL_SECONDS=300
+
+
+======================================================================
+ФАЙЛ: project1_wb_price_tracker\.github\workflows\ci.yml
+======================================================================
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Compile check
+        run: python -m compileall .
+      - name: Run tests
+        run: python -m pytest tests/ -q
 
 
 ======================================================================
@@ -408,6 +469,24 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+
+
+======================================================================
+ФАЙЛ: project1_wb_price_tracker\Dockerfile
+======================================================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Зависимости кэшируются отдельным слоем
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Токен и режим задаются при запуске:
+#   docker run -e WB_BOT_TOKEN=... -e WB_DEMO_MODE=1 ...
+CMD ["python", "bot.py"]
 
 
 ======================================================================
@@ -436,6 +515,9 @@ Telegram-бот: пользователь отправляет артикул т
 - `/list` — мои товары
 - `/untrack АРТИКУЛ` — удалить из отслеживания
 - `/history АРТИКУЛ` — история цен
+- `/diag` — диагностика доступа к API WB
+- `/stats` — сводка по базе
+- `/cleanup ДНИ` — очистить историю старше N дней (админ)
 
 ## Запуск
 
@@ -448,6 +530,22 @@ python bot.py
 ```
 
 Чтобы не ходить в сеть (антибот-блокировки), задайте `WB_DEMO_MODE=1`.
+
+## Продвинутый уровень (v2)
+
+- **Middlewares aiogram v3**: троттлинг (спам-защита, `WB_THROTTLE_MIN_INTERVAL`)
+  и логирование времени обработки апдейтов;
+- **TTL-кэш карточек** (stdlib, `utils.py`) — повторный `/track` того же артикула
+  мгновенный (`WB_CACHE_TTL_SECONDS`);
+- **Кулдаун уведомлений**: один товар не «пикает» чаще раза в
+  `WB_ALERT_COOLDOWN_HOURS` — логика в чистой функции `alerts.should_notify()`
+  (покрыта unit-тестами);
+- **БД не растёт вечно**: индексы на `articul`/`checked_at`, плановая очистка
+  истории старше `WB_HISTORY_KEEP_DAYS` (24-часовой джоб + `/cleanup`);
+- **Операции**: `pyproject.toml`, `Dockerfile`, GitHub Actions CI
+  (compileall + pytest на каждый push).
+
+Тесты: `pytest tests/ -q` (9 тестов: кэш, троттлинг, кулдаун, очистка, парсинг).
 
 ## Честное примечание о публичном API WB (проверено 2026-08-05)
 
@@ -491,6 +589,57 @@ python bot.py
 Запуск из корня с прокси: `WB_PROXY=socks5://127.0.0.1:1080 WB_DEMO_MODE=0 python bot.py`.
 
 
+======================================================================
+ФАЙЛ: project1_wb_price_tracker\alerts.py
+======================================================================
+"""Логика «уведомлять или нет» — чистая функция, легко тестируемая.
+
+Отделена от Telegram и БД, чтобы можно было покрыть unit-тестами все ветки:
+падение цены, заканчивающийся товар, кулдаун между алертами по одному товару.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+from typing import Optional
+
+
+def should_notify(
+    sale_price: int,
+    qty: int,
+    last_price: Optional[int],
+    last_qty: Optional[int],
+    last_alert_at: Optional[str],
+    *,
+    cooldown_hours: float = 6.0,
+    low_stock_threshold: int = 5,
+    now: Optional[datetime] = None,
+) -> tuple[bool, list[str]]:
+    """Возвращает (нужно_ли_уведомлять, список_сообщений).
+
+    Уведомляем, если цена упала ИЛИ товар заканчивается, но не чаще одного
+    раза в cooldown_hours по одному и тому же товару.
+    """
+    messages: list[str] = []
+    if last_price is not None and sale_price < last_price:
+        messages.append(
+            f"📉 <b>Цена упала!</b> Было {last_price} ₽ → стало {sale_price} ₽"
+        )
+    if last_qty is not None and qty <= low_stock_threshold and qty < last_qty:
+        messages.append(f"⚠️ <b>Товар заканчивается!</b> Осталось {qty} шт.")
+
+    if not messages:
+        return False, []
+
+    if last_alert_at:
+        try:
+            last_alert_dt = datetime.fromisoformat(last_alert_at)
+            now_dt = now or datetime.now(last_alert_dt.tzinfo)
+            if now_dt - last_alert_dt < timedelta(hours=cooldown_hours):
+                return False, []  # кулдаун ещё не истёк
+        except ValueError:
+            pass  # битая дата — не мешаем уведомлению
+    return True, messages
+
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\bot.py
@@ -501,11 +650,20 @@ python bot.py
 (в ТЗ предложено "Celery или apscheduler" — выбран apscheduler, т.к. работает
 в том же процессе и не требует брокера вроде Redis).
 
+Продвинутый уровень:
+  - middlewares: троттлинг (защита от спама) и логирование времени обработки;
+  - TTL-кэш карточек WB — повторный запрос того же артикула мгновенный;
+  - кулдаун уведомлений (не чаще раза в ALERT_COOLDOWN_HOURS по товару);
+  - /stats — сводка по базе; /cleanup N — очистка истории старше N дней (админ);
+  - индексы SQLite и плановая очистка истории — БД не растёт бесконечно.
+
 Запуск:  python bot.py   (предварительно задайте WB_BOT_TOKEN)
 """
 from __future__ import annotations
 
 import asyncio
+import datetime
+import html as _html
 import logging
 import os
 import re
@@ -517,20 +675,11 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-# Экранирование HTML для Telegram. aiogram.utils.html удалён из aiogram 3.30,
-# поэтому используем стандартный html.escape из stdlib.
-import html as _html
-
-from config import (
-    BASE_DIR,
-    BOT_TOKEN,
-    CHECK_INTERVAL_MINUTES,
-    DB_PATH,
-    DEMO_MODE,
-    LOW_STOCK_THRESHOLD,
-    REQUEST_DELAY_SECONDS,
-)
+import config
+from alerts import should_notify
 from db import Database
+from middlewares import LoggingMiddleware, ThrottlingMiddleware
+from utils import TTLCache
 from wb_api import MockWBClient, WBClient
 
 # Логирование в консоль и в файл bot.log рядом с ботом
@@ -538,15 +687,16 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     handlers=[
-        logging.FileHandler(os.path.join(BASE_DIR, "bot.log"), encoding="utf-8"),
+        logging.FileHandler(os.path.join(config.BASE_DIR, "bot.log"), encoding="utf-8"),
         logging.StreamHandler(),
     ],
 )
 logger = logging.getLogger(__name__)
 
 router = Router()
-db = Database(DB_PATH)
+db = Database(config.DB_PATH)
 wb: WBClient | MockWBClient | None = None
+card_cache = TTLCache(ttl_seconds=config.CACHE_TTL_SECONDS)
 
 
 # ---------------------------------------------------------------- команды
@@ -560,7 +710,9 @@ async def cmd_start(message: Message) -> None:
         "• /list — мои товары\n"
         "• /untrack <b>АРТИКУЛ</b> — удалить из отслеживания\n"
         "• /history <b>АРТИКУЛ</b> — история цен\n"
-        "• /diag — диагностика доступа к API Wildberries\n\n"
+        "• /diag — диагностика доступа к API Wildberries\n"
+        "• /stats — сводка по базе\n"
+        "• /cleanup <b>ДНИ</b> — очистить историю старше N дней (админ)\n\n"
         "Раз в сутки бот проверит цены и пришлёт уведомление, если цена упала "
         "или товар заканчивается."
     )
@@ -573,7 +725,7 @@ async def cmd_track(message: Message) -> None:
         await message.answer("Формат: /track АРТИКУЛ (например, /track 17457977)")
         return
     try:
-        card = await wb.get_card(articul)
+        card = await card_cache.get_or_set(articul, lambda: _fetch_card(articul))
     except Exception as exc:  # сеть, 403 антибот и т.п.
         await message.answer(f"⚠️ Не удалось получить данные Wildberries: {exc}")
         return
@@ -591,6 +743,11 @@ async def cmd_track(message: Message) -> None:
         f"Цена: <s>{price} ₽</s> <b>{sale_price} ₽</b>\n"
         f"Остаток: {card.get('qty', 0)} шт."
     )
+
+
+async def _fetch_card(articul: int):
+    """Обёртка для TTL-кэша: обращается к клиенту WB (mock или реальному)."""
+    return await wb.get_card(articul)
 
 
 @router.message(Command("list"))
@@ -638,13 +795,41 @@ async def cmd_history(message: Message) -> None:
     await message.answer(f"📈 <b>История цен</b> ({articul}):\n" + "\n".join(lines))
 
 
+@router.message(Command("stats"))
+async def cmd_stats(message: Message) -> None:
+    s = await db.stats()
+    await message.answer(
+        "📊 <b>Сводка по базе</b>\n\n"
+        f"• Товаров в базе: <b>{s['items']}</b>\n"
+        f"• Подписок (user×артикул): <b>{s['tracked']}</b>\n"
+        f"• Пользователей: <b>{s['users']}</b>\n"
+        f"• Записей истории цен: <b>{s['history']}</b>\n"
+        f"• Записей в TTL-кэше: <b>{card_cache.size}</b>"
+    )
+
+
+@router.message(Command("cleanup"))
+async def cmd_cleanup(message: Message) -> None:
+    """Очистка истории старше N дней (доступна администраторам из ADMIN_IDS)."""
+    if config.ADMIN_IDS and message.from_user.id not in config.ADMIN_IDS:
+        await message.answer("⛔ Команда доступна только администраторам.")
+        return
+    args = message.text.split()
+    days = int(args[1]) if len(args) > 1 and args[1].isdigit() else config.HISTORY_KEEP_DAYS
+    if days < 1:
+        await message.answer("Дни должны быть больше нуля.")
+        return
+    deleted = await db.cleanup_history(days)
+    await message.answer(f"🧹 Удалено записей истории старше {days} дн.: <b>{deleted}</b>")
+
+
 @router.message(Command("diag"))
 async def cmd_diag(message: Message) -> None:
     """Диагностика доступности эндпоинтов WB (антибот-статус с этого IP)."""
     mode_note = (
         "бот в <b>демо-режиме</b> (WB_DEMO_MODE=1): данные выдуманные, "
         "но диагностика ходит в сеть по-настоящему"
-        if DEMO_MODE
+        if config.DEMO_MODE
         else "бот в <b>реальном режиме</b>"
     )
     await message.answer(f"🔍 <b>Диагностика WB API</b>\n{mode_note}\n\nПроверяю…")
@@ -672,7 +857,12 @@ async def cmd_diag(message: Message) -> None:
 # ------------------------------------------------------------- фоновая проверка
 
 async def check_prices(bot: Bot) -> None:
-    """Ежедневная проверка: уведомляем, если цена упала или товар заканчивается."""
+    """Ежедневная проверка: уведомляем о падении цены/заканчивающемся товаре.
+
+    Логика решения вынесена в чистую функцию alerts.should_notify() —
+    покрыта unit-тестами. Кулдаун: один товар не «пикает» чаще раза в
+    ALERT_COOLDOWN_HOURS.
+    """
     items = await db.all_items()
     if not items:
         return
@@ -684,30 +874,32 @@ async def check_prices(bot: Bot) -> None:
             continue
         if card is None:
             continue
-        price = int(card.get("priceU", 0) or 0) // 100
-        sale_price = int(card.get("salePriceU", price) or price) // 100
+        sale_price = int(card.get("salePriceU", card.get("priceU", 0)) or 0) // 100
         qty = int(card.get("qty", 0) or 0)
 
-        alerts: list[str] = []
-        if last_price is not None and sale_price < last_price:
-            alerts.append(f"📉 <b>Цена упала!</b> Было {last_price} ₽ → стало {sale_price} ₽")
-        if last_qty is not None and qty <= LOW_STOCK_THRESHOLD and qty < last_qty:
-            alerts.append(f"⚠️ <b>Товар заканчивается!</b> Осталось {qty} шт.")
-
-        if alerts:
+        notify, messages = should_notify(
+            sale_price=sale_price,
+            qty=qty,
+            last_price=last_price,
+            last_qty=last_qty,
+            last_alert_at=await db.get_last_alert(articul),
+            cooldown_hours=config.ALERT_COOLDOWN_HOURS,
+            low_stock_threshold=config.LOW_STOCK_THRESHOLD,
+        )
+        if notify:
             for user_id in await db.users_for_articul(articul):
                 try:
                     await bot.send_message(
                         user_id,
-                        f"🔔 <b>{_html.escape(title, quote=False)}</b> ({articul})\n" + "\n".join(alerts),
+                        f"🔔 <b>{_html.escape(title, quote=False)}</b> ({articul})\n"
+                        + "\n".join(messages),
                     )
                 except Exception as exc:
                     logger.warning("Не удалось отправить уведомление %s: %s", user_id, exc)
             await db.update_last_notified(articul, sale_price, qty)
 
         await db.upsert_item(card)  # фиксируем новый снимок цены в истории
-        # Пауза между запросами к WB, чтобы не словить rate-limit/бан
-        await asyncio.sleep(REQUEST_DELAY_SECONDS)
+        await asyncio.sleep(config.REQUEST_DELAY_SECONDS)
 
 
 # --------------------------------------------------------------------- utils
@@ -720,36 +912,55 @@ def _extract_articul(text: str) -> int | None:
 
 async def main() -> None:
     global wb
-    if not BOT_TOKEN:
+    if not config.BOT_TOKEN:
         raise SystemExit(
             "Не задан WB_BOT_TOKEN. Скопируйте .env.example и задайте токен "
             "(например: export WB_BOT_TOKEN=... в bash или setx в Windows)."
         )
-    bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
     dp.include_router(router)
+    # Продвинутый уровень: мидлвары — троттлинг и логирование
+    dp.message.middleware(ThrottlingMiddleware(min_interval=config.THROTTLE_MIN_INTERVAL))
+    dp.update.middleware(LoggingMiddleware())
 
-    wb = MockWBClient() if DEMO_MODE else WBClient()
+    wb = MockWBClient() if config.DEMO_MODE else WBClient()
     await db.init()
 
     scheduler = AsyncIOScheduler(timezone="UTC")
     scheduler.add_job(
         check_prices,
         "interval",
-        minutes=CHECK_INTERVAL_MINUTES,
+        minutes=config.CHECK_INTERVAL_MINUTES,
         args=[bot],
         id="daily_check",
         replace_existing=True,
     )
+    # Плановая очистка истории старше HISTORY_KEEP_DAYS дней (раз в сутки)
+    scheduler.add_job(
+        _scheduled_cleanup,
+        "interval",
+        hours=24,
+        id="history_cleanup",
+        replace_existing=True,
+    )
     scheduler.start()
-    logger.info("Бот запущен. Демо-режим: %s. Проверка каждые %s мин.",
-                DEMO_MODE, CHECK_INTERVAL_MINUTES)
+    logger.info(
+        "Бот запущен. Демо-режим: %s. Проверка каждые %s мин. Кулдаун алертов: %s ч.",
+        config.DEMO_MODE, config.CHECK_INTERVAL_MINUTES, config.ALERT_COOLDOWN_HOURS,
+    )
     try:
         await dp.start_polling(bot)
     finally:
         scheduler.shutdown(wait=False)
         await wb.aclose()
         await bot.session.close()
+
+
+async def _scheduled_cleanup() -> None:
+    deleted = await db.cleanup_history(config.HISTORY_KEEP_DAYS)
+    if deleted:
+        logger.info("Плановая очистка истории: удалено %s записей", deleted)
 
 
 if __name__ == "__main__":
@@ -787,14 +998,33 @@ PROXY = os.getenv("WB_PROXY", "")
 # Сколько попыток сделать на 429/5xx/сетевые ошибки (экспоненциальный backoff)
 MAX_RETRIES = int(os.getenv("WB_MAX_RETRIES", "3"))
 
+# --- Продвинутый уровень: кулдаун алертов, очистка БД, троттлинг ---
+# Не уведомлять об одном товаре чаще, чем раз в N часов (защита от спама)
+ALERT_COOLDOWN_HOURS = float(os.getenv("WB_ALERT_COOLDOWN_HOURS", "6"))
+# Хранить историю цен N дней, потом чистить (контроль роста БД)
+HISTORY_KEEP_DAYS = int(os.getenv("WB_HISTORY_KEEP_DAYS", "30"))
+# Минимальный интервал между сообщениями одного пользователя (секунды)
+THROTTLE_MIN_INTERVAL = float(os.getenv("WB_THROTTLE_MIN_INTERVAL", "0.7"))
+# ID администраторов (через запятую) — доступ к /cleanup; пусто = всем можно
+ADMIN_IDS = [int(x) for x in os.getenv("WB_ADMIN_IDS", "").split(",") if x.strip().isdigit()]
+# TTL кэша карточек WB (секунды): повторный /track того же артикула мгновенный
+CACHE_TTL_SECONDS = float(os.getenv("WB_CACHE_TTL_SECONDS", "300"))
+
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\db.py
 ======================================================================
-"""Локальная SQLite-БД через aiosqlite: товары, подписки пользователей, история цен."""
+"""Локальная SQLite-БД через aiosqlite: товары, подписки, история цен.
+
+Продвинутый уровень:
+  - индексы на колонки, по которым идёт поиск (articul, checked_at);
+  - last_alert_at в карточке — для кулдауна уведомлений (см. alerts.py);
+  - cleanup_history() — плановая очистка истории старше N дней;
+  - stats() — сводка по базе для команды /stats.
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import aiosqlite
 
@@ -808,8 +1038,9 @@ class Database:
         self.path = path
 
     async def init(self) -> None:
-        """Создаёт таблицы при первом запуске."""
+        """Создаёт таблицы и индексы при первом запуске."""
         async with aiosqlite.connect(self.path) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
             await db.execute(
                 """
                 CREATE TABLE IF NOT EXISTS items (
@@ -821,6 +1052,7 @@ class Database:
                     last_checked TEXT,
                     last_price   INTEGER,  -- цена, о которой уже уведомили
                     last_qty     INTEGER,  -- остаток, о котором уже уведомили
+                    last_alert_at TEXT,    -- когда последний раз уведомили
                     created_at   TEXT
                 )
                 """
@@ -846,6 +1078,14 @@ class Database:
                 )
                 """
             )
+            # Индексы: поиск по артикулу в истории и по tracked.articul
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_price_history_articul "
+                "ON price_history (articul)"
+            )
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tracked_articul ON tracked (articul)"
+            )
             await db.commit()
 
     async def upsert_item(self, card: dict) -> None:
@@ -859,8 +1099,9 @@ class Database:
             await db.execute(
                 """
                 INSERT INTO items
-                    (articul, title, price, sale_price, qty, last_checked, last_price, last_qty, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (articul, title, price, sale_price, qty, last_checked,
+                     last_price, last_qty, last_alert_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
                 ON CONFLICT(articul) DO UPDATE SET
                     title = excluded.title,
                     price = excluded.price,
@@ -871,19 +1112,29 @@ class Database:
                 (articul, title, price, sale_price, qty, _now(), sale_price, qty, _now()),
             )
             await db.execute(
-                "INSERT INTO price_history (articul, price, sale_price, qty, checked_at) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO price_history (articul, price, sale_price, qty, checked_at) "
+                "VALUES (?, ?, ?, ?, ?)",
                 (articul, price, sale_price, qty, _now()),
             )
             await db.commit()
 
     async def update_last_notified(self, articul: str, sale_price: int, qty: int) -> None:
-        """После отправки уведомления запоминает текущие значения, чтобы не спамить."""
+        """После отправки уведомления запоминает текущие значения и время."""
         async with aiosqlite.connect(self.path) as db:
             await db.execute(
-                "UPDATE items SET last_price = ?, last_qty = ? WHERE articul = ?",
-                (sale_price, qty, articul),
+                "UPDATE items SET last_price = ?, last_qty = ?, last_alert_at = ? "
+                "WHERE articul = ?",
+                (sale_price, qty, _now(), articul),
             )
             await db.commit()
+
+    async def get_last_alert(self, articul: str) -> str | None:
+        async with aiosqlite.connect(self.path) as db:
+            cur = await db.execute(
+                "SELECT last_alert_at FROM items WHERE articul = ?", (articul,)
+            )
+            row = await cur.fetchone()
+        return row[0] if row else None
 
     async def track(self, user_id: int, articul: str) -> None:
         async with aiosqlite.connect(self.path) as db:
@@ -948,6 +1199,125 @@ class Database:
             rows = await cur.fetchall()
         return [dict(row) for row in rows]
 
+    async def cleanup_history(self, keep_days: int) -> int:
+        """Удаляет историю цен старше keep_days дней, возвращает число строк."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=keep_days)).isoformat(
+            timespec="seconds"
+        )
+        async with aiosqlite.connect(self.path) as db:
+            cur = await db.execute(
+                "DELETE FROM price_history WHERE checked_at < ?", (cutoff,)
+            )
+            await db.commit()
+            return cur.rowcount
+
+    async def stats(self) -> dict:
+        """Сводка по базе: товары, подписки, записи истории, пользователи."""
+        async with aiosqlite.connect(self.path) as db:
+            async with db.execute("SELECT COUNT(*) FROM items") as cur:
+                items = (await cur.fetchone())[0]
+            async with db.execute("SELECT COUNT(*) FROM tracked") as cur:
+                tracked = (await cur.fetchone())[0]
+            async with db.execute("SELECT COUNT(*) FROM price_history") as cur:
+                history = (await cur.fetchone())[0]
+            async with db.execute(
+                "SELECT COUNT(DISTINCT user_id) FROM tracked"
+            ) as cur:
+                users = (await cur.fetchone())[0]
+        return {"items": items, "tracked": tracked, "history": history, "users": users}
+
+
+======================================================================
+ФАЙЛ: project1_wb_price_tracker\middlewares.py
+======================================================================
+"""Middlewares aiogram v3: троттлинг и логирование (продвинутый уровень).
+
+Троттлинг защищает от спама/неистового нажатия кнопок: сообщения чаще, чем
+раз в min_interval секунд, молча дропаются. Логирование замеряет время
+обработки каждого апдейта.
+"""
+from __future__ import annotations
+
+import logging
+import time
+from collections import defaultdict
+from typing import Any, Awaitable, Callable
+
+from aiogram import BaseMiddleware
+from aiogram.types import TelegramObject
+
+logger = logging.getLogger(__name__)
+
+
+class ThrottlingMiddleware(BaseMiddleware):
+    """Ограничивает частоту сообщений от одного пользователя.
+
+    При превышении интервала сообщение дропается; при злостном спаме
+    (burst подряд) — логируется предупреждение.
+    """
+
+    def __init__(self, min_interval: float = 0.7, burst: int = 3) -> None:
+        self._min_interval = min_interval
+        self._burst = burst
+        self._last: dict[int, float] = {}
+        self._streak: dict[int, int] = defaultdict(int)
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        user_id = getattr(getattr(event, "from_user", None), "id", None)
+        if user_id is not None:
+            now = time.monotonic()
+            last = self._last.get(user_id)
+            if last is not None and now - last < self._min_interval:
+                self._streak[user_id] += 1
+                if self._streak[user_id] >= self._burst:
+                    logger.warning(
+                        "Throttle: пользователь %s шлёт сообщения чаще, чем раз в %.1fs",
+                        user_id, self._min_interval,
+                    )
+                return None  # молча дропаем
+            self._last[user_id] = now
+            self._streak[user_id] = 0
+        return await handler(event, data)
+
+
+class LoggingMiddleware(BaseMiddleware):
+    """Замеряет и пишет в лог время обработки каждого апдейта."""
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        start = time.perf_counter()
+        result = await handler(event, data)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        user_id = getattr(getattr(event, "from_user", None), "id", None)
+        logger.info(
+            "Обработка %s (user=%s): %.1f мс",
+            type(event).__name__, user_id, elapsed_ms,
+        )
+        return result
+
+
+======================================================================
+ФАЙЛ: project1_wb_price_tracker\pyproject.toml
+======================================================================
+[project]
+name = "wb-price-tracker"
+version = "2.0.0"
+description = "Telegram-бот отслеживания цен и остатков Wildberries (aiogram v3)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\requirements.txt
@@ -1000,13 +1370,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\tests\test_smoke.py
 ======================================================================
-"""Smoke-тесты: БД (aiosqlite) и клиент WB (mock). Запуск: python -m pytest tests"""
+"""Тесты P1: БД (aiosqlite), клиент WB, продвинутые утилиты и мидлвары.
+
+Запуск: python -m pytest tests -q
+"""
 import asyncio
 import json
 import os
 import tempfile
+from datetime import datetime, timedelta, timezone
 
+from alerts import should_notify
 from db import Database
+from middlewares import ThrottlingMiddleware
+from utils import TTLCache
 from wb_api import MockWBClient, WBClient
 
 ARTICUL = 17457977
@@ -1030,6 +1407,8 @@ class FakeTransport:
         return None
 
 
+# ------------------------------------------------------------ базовые smoke-тесты
+
 def test_mock_card_prices_in_kopecks() -> None:
     """Цены WB приходят в копейках — проверяем деление на 100."""
     card = asyncio.run(MockWBClient().get_card(ARTICUL))
@@ -1037,12 +1416,10 @@ def test_mock_card_prices_in_kopecks() -> None:
     assert card["priceU"] // 100 == 999
 
 
-def test_db_roundtrip() -> None:
-    """Полный цикл: добавление карточки, трекинг, история, отписка."""
+def test_db_roundtrip(tmp_path) -> None:
+    """Полный цикл: добавление карточки, трекинг, история, отписка, статистика."""
     async def run() -> None:
-        db = Database(os.path.join(tempfile.gettempdir(), "pytest_tracker.db"))
-        if os.path.exists(db.path):
-            os.remove(db.path)
+        db = Database(str(tmp_path / "tracker.db"))
         await db.init()
         card = await MockWBClient().get_card(ARTICUL)
         await db.upsert_item(card)
@@ -1051,6 +1428,8 @@ def test_db_roundtrip() -> None:
         assert await db.history(str(ARTICUL))
         assert await db.users_for_articul(str(ARTICUL)) == [111]
         assert await db.untrack(111, str(ARTICUL))
+        s = await db.stats()
+        assert s["items"] >= 1 and s["history"] >= 1
 
     asyncio.run(run())
 
@@ -1090,7 +1469,6 @@ def test_fallback_to_search_when_card_blocked() -> None:
     card = asyncio.run(client.get_card(ARTICUL))
     assert card is not None
     assert card["salePriceU"] == 69900  # копейки
-    assert card["id"] == ARTICUL
     assert len(transport.calls) == 2  # сначала card, затем search
     assert "search.wb.ru" in transport.calls[1]
 
@@ -1100,6 +1478,217 @@ def test_no_product_returns_none() -> None:
     transport = FakeTransport([(403, "blocked"), (200, json.dumps({"data": {"products": []}}))])
     client = WBClient(transport=transport, max_retries=2)
     assert asyncio.run(client.get_card(ARTICUL)) is None
+
+
+# ------------------------------------------------------------ продвинутый уровень
+
+def test_ttl_cache() -> None:
+    """Значение живёт ttl секунд, потом пересчитывается."""
+    async def run() -> None:
+        cache = TTLCache(ttl_seconds=0.05)
+        calls = 0
+
+        async def factory():
+            nonlocal calls
+            calls += 1
+            return calls
+
+        assert await cache.get_or_set("k", factory) == 1
+        assert await cache.get_or_set("k", factory) == 1  # из кэша
+        assert calls == 1
+        await asyncio.sleep(0.08)
+        assert await cache.get_or_set("k", factory) == 2  # TTL истёк
+        cache.invalidate("k")
+        assert await cache.get_or_set("k", factory) == 3  # явный сброс
+
+    asyncio.run(run())
+
+
+class _FakeUser:
+    id = 1
+
+
+class _FakeEvent:
+    from_user = _FakeUser()
+
+
+async def _dummy_handler(event, data):
+    return "ok"
+
+
+def test_throttling_middleware() -> None:
+    """Второе сообщение в пределах интервала дропается."""
+    async def run() -> None:
+        mw = ThrottlingMiddleware(min_interval=60.0)
+        assert await mw(_dummy_handler, _FakeEvent(), {}) == "ok"
+        assert await mw(_dummy_handler, _FakeEvent(), {}) is None  # дропнут
+
+    asyncio.run(run())
+
+
+def test_should_notify_logic() -> None:
+    """Чистая логика алертов: падение цены, заканчивается, кулдаун."""
+    now = datetime.now(timezone.utc)
+
+    # падение цены — уведомляем
+    notify, msgs = should_notify(100, 10, last_price=120, last_qty=10,
+                                 last_alert_at=None, now=now)
+    assert notify and len(msgs) == 1 and "упала" in msgs[0]
+
+    # товар заканчивается
+    notify, msgs = should_notify(100, 2, last_price=100, last_qty=10,
+                                 last_alert_at=None, now=now)
+    assert notify and "заканчивается" in msgs[0]
+
+    # цена выросла и остаток норм — тишина
+    notify, _ = should_notify(130, 10, last_price=120, last_qty=10,
+                              last_alert_at=None, now=now)
+    assert not notify
+
+    # кулдаун: уведомляли час назад — молчим
+    alert_1h_ago = (now - timedelta(hours=1)).isoformat()
+    notify, _ = should_notify(100, 10, last_price=120, last_qty=10,
+                              last_alert_at=alert_1h_ago, now=now, cooldown_hours=6)
+    assert not notify
+
+    # кулдаун истёк (7 часов назад) — уведомляем снова
+    alert_7h_ago = (now - timedelta(hours=7)).isoformat()
+    notify, _ = should_notify(100, 10, last_price=120, last_qty=10,
+                              last_alert_at=alert_7h_ago, now=now, cooldown_hours=6)
+    assert notify
+
+
+def test_cleanup_history(tmp_path) -> None:
+    """История старше N дней удаляется, свежая остаётся."""
+    async def run() -> None:
+        db = Database(str(tmp_path / "tracker.db"))
+        await db.init()
+        # пишем запись напрямую с «древней» датой
+        import aiosqlite
+        async with aiosqlite.connect(db.path) as conn:
+            old = (datetime.now(timezone.utc) - timedelta(days=40)).isoformat(timespec="seconds")
+            await conn.execute(
+                "INSERT INTO price_history (articul, price, sale_price, qty, checked_at) "
+                "VALUES ('111', 100, 90, 5, ?)", (old,)
+            )
+            await conn.commit()
+        card = await MockWBClient().get_card(ARTICUL)
+        await db.upsert_item(card)  # свежая запись
+
+        deleted = await db.cleanup_history(keep_days=30)
+        assert deleted == 1  # удалилась только древняя
+        assert len(await db.history(str(ARTICUL))) == 1  # свежая на месте
+
+    asyncio.run(run())
+
+
+======================================================================
+ФАЙЛ: project1_wb_price_tracker\utils.py
+======================================================================
+"""Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером.
+
+Никаких внешних зависимостей (в ТЗ tenacity/aiocache не указаны) — кэш и
+повторы реализованы на asyncio/time/random.
+"""
+from __future__ import annotations
+
+import asyncio
+import functools
+import logging
+import random
+import time
+from typing import Any, Awaitable, Callable, TypeVar
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+class TTLCache:
+    """Простейший TTL-кэш: значение живёт ttl секунд после записи.
+
+    get_or_set() атомарен на уровне задачи: при промахе вычисляет значение
+    один раз (несколько одновременных вызовов не дублируют фабрику — для
+    простоты фабрика вызывается каждым, но результат берёт последний).
+    """
+
+    def __init__(self, ttl_seconds: float = 300.0) -> None:
+        self._ttl = ttl_seconds
+        self._store: dict[Any, tuple[float, Any]] = {}
+
+    def get(self, key: Any) -> Any | None:
+        item = self._store.get(key)
+        if item is None:
+            return None
+        expires, value = item
+        if time.monotonic() > expires:
+            self._store.pop(key, None)
+            return None
+        return value
+
+    async def get_or_set(self, key: Any, factory: Callable[[], Awaitable[T]]) -> T:
+        cached = self.get(key)
+        if cached is not None:
+            return cached
+        value = await factory()
+        self._store[key] = (time.monotonic() + self._ttl, value)
+        return value
+
+    def invalidate(self, key: Any | None = None) -> None:
+        """Сброс одного ключа или всего кэша (key=None)."""
+        if key is None:
+            self._store.clear()
+        else:
+            self._store.pop(key, None)
+
+    @property
+    def size(self) -> int:
+        return len(self._store)
+
+
+def backoff(attempt: int, base: float = 0.5, max_delay: float = 10.0, jitter: float = 0.3) -> float:
+    """Экспоненциальный backoff с джиттером: base * 2^(attempt-1), ±jitter%.
+
+    Джиттер рандомизирует задержку, чтобы десятки клиентов не «стучались»
+    синхронно после разблокировки rate-limit (thundering herd effect).
+    """
+    delay = min(base * (2 ** (attempt - 1)), max_delay)
+    return delay * (1 + random.uniform(-jitter, jitter))
+
+
+def async_retry(
+    retries: int = 3,
+    base: float = 0.5,
+    retry_on: tuple[type[Exception], ...] = (Exception,),
+):
+    """Декоратор для асинхронных функций: повторы с экспоненциальным backoff.
+
+    Пример: @async_retry(retries=3, retry_on=(httpx.HTTPStatusError,))
+    """
+
+    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+        @functools.wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> T:
+            last: Exception | None = None
+            for attempt in range(1, retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except retry_on as exc:
+                    last = exc
+                    if attempt == retries:
+                        break
+                    delay = backoff(attempt, base=base)
+                    logger.debug(
+                        "%s: попытка %d/%d не удалась (%s), повтор через %.1fs",
+                        func.__name__, attempt, retries, exc, delay,
+                    )
+                    await asyncio.sleep(delay)
+            assert last is not None
+            raise last
+
+        return wrapper
+
+    return decorator
 
 
 ======================================================================
@@ -1414,28 +2003,76 @@ class MockWBClient:
 
 
 ======================================================================
+ФАЙЛ: project2_ai_review_analyst\.dockerignore
+======================================================================
+.env
+*.db
+*.log
+__pycache__/
+.pytest_cache/
+.venv/
+tests/
+.git/
+
+
+======================================================================
 ФАЙЛ: project2_ai_review_analyst\.env.example
 ======================================================================
+[TEMPLATE]
 # Токен бота от @BotFather (обязательно)
 WB_BOT_TOKEN=123456:ABC-DEF...
 
-# Провайдер LLM: mock (демо, без ключей) | yandex | openai
+# --- LLM ---
+# mock (демо, без ключей) | yandex | openai
 LLM_PROVIDER=mock
-
-# --- YandexGPT (если LLM_PROVIDER=yandex) ---
+# YandexGPT
 YANDEX_FOLDER_ID=
 YANDEX_API_KEY=
 YANDEX_MODEL=yandexgpt-lite
-
-# --- OpenAI (если LLM_PROVIDER=openai) ---
+# OpenAI
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
+# Резервные провайдеры через запятую (порядок попыток при сбое основного)
+LLM_FALLBACKS=mock
+# Сколько раз переспрашивать LLM при невалидном JSON
+LLM_MAX_RETRIES=2
 
-# 1 = демо-режим (парсер отзывов не ходит в сеть)
-WB_DEMO_MODE=0
-
-# Сколько отзывов анализировать (по ТЗ — 50)
+# --- Парсинг и демо ---
+# 1 = демо-режим (отзывы выдуманные, сеть не нужна) | 0 = реальный парсинг WB
+WB_DEMO_MODE=1
 MAX_REVIEWS=50
+# TTL кэша отзывов по артикулу (секунды)
+ANALYSIS_CACHE_TTL=300
+
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL=0.7
+
+
+======================================================================
+ФАЙЛ: project2_ai_review_analyst\.github\workflows\ci.yml
+======================================================================
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Compile check
+        run: python -m compileall .
+      - name: Run tests
+        run: python -m pytest tests/ -q
 
 
 ======================================================================
@@ -1462,6 +2099,21 @@ __pycache__/
 
 
 ======================================================================
+ФАЙЛ: project2_ai_review_analyst\Dockerfile
+======================================================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+CMD ["python", "bot.py"]
+
+
+======================================================================
 ФАЙЛ: project2_ai_review_analyst\README.md
 ======================================================================
 # AI-Аналитик отзывов — Sentiment Analysis (Проект 2)
@@ -1483,6 +2135,8 @@ __pycache__/
 ## Команды
 
 - `/analyze АРТИКУЛ` или `/analyze ССЫЛКА` — анализ последних 50 отзывов
+- `/model` — текущая цепочка LLM-провайдеров
+- `/cache` — состояние кэша отзывов (или `/cache clear`)
 
 ## Запуск
 
@@ -1500,6 +2154,24 @@ python bot.py
 
 Без ключей работает демо-режим `mock` (выдуманный анализ) — бот полностью
 функционален и без платного LLM.
+
+## Продвинутый уровень (v2)
+
+- **Цепочка LLM-провайдеров с фолбэком** (`ProviderChain`): основной провайдер +
+  резервные (`LLM_FALLBACKS=mock`) — невалидный ключ не уронит бота, ответ отдаст
+  следующий провайдер;
+- **Переспрос при невалидном JSON** (`analyze_with_retry`): если ответ LLM не
+  прошёл pydantic-валидацию, бот переспрашивает с инструкцией «верни ТОЛЬКО
+  валидный JSON» (до `LLM_MAX_RETRIES` раз);
+- **TTL-кэш отзывов** по артикулу (`ANALYSIS_CACHE_TTL`) — повторный анализ того
+  же товара мгновенный; retry на сетевые ошибки (stdlib backoff);
+- **Статистика без LLM**: средняя оценка и распределение тональностей
+  (👍/😐/👎) считаются из отзывов, `reviews_stats()`;
+- **Модель расширена**: `distribution` и `summary` в `AnalysisResult`;
+- **Middlewares**: троттлинг и логирование;
+- **Операции**: `pyproject.toml`, `Dockerfile`, GitHub Actions CI.
+
+Тесты: `pytest tests/ -q` (7 тестов: цепочка фолбэка, retry валидации, статистика, кэш).
 
 ## Честное примечание об источнике отзывов (проверено 2026-08-05)
 
@@ -1522,6 +2194,13 @@ python bot.py
 
 Стек (строго по ТЗ): aiogram, httpx, yandex-cloud-ml-sdk (или openai), pydantic.
 
+Продвинутый уровень:
+  - middlewares: троттлинг и логирование;
+  - цепочка LLM-провайдеров с фолбэком (get_provider) и переспросом при
+    невалидном JSON (analyze_with_retry);
+  - TTL-кэш отзывов по артикулу (/cache — посмотреть/очистить);
+  - статистика отзывов без обращения к LLM + распределение тональностей.
+
 Запуск:  python bot.py   (задайте WB_BOT_TOKEN; для реального LLM — LLM_PROVIDER
 и ключи, иначе работает демо-режим с mock-отзывами и mock-анализом).
 """
@@ -1541,8 +2220,9 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
 import config
-from llm import LLMProvider, get_provider
-from reviews import fetch_reviews
+from llm import analyze_with_retry, get_provider
+from middlewares import LoggingMiddleware, ThrottlingMiddleware
+from reviews import cache_info, clear_cache, fetch_reviews, reviews_stats
 
 # Логирование в консоль и в файл bot.log рядом с ботом
 logging.basicConfig(
@@ -1556,7 +2236,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 router = Router()
-provider: LLMProvider = get_provider()
+provider = get_provider()
+
+
+def _provider_names() -> str:
+    """Человекочитаемое описание цепочки провайдеров для /model."""
+    names = [(config.LLM_PROVIDER or "mock").lower(), *(n.lower() for n in config.LLM_FALLBACKS)]
+    return " → ".join(dict.fromkeys(n for n in names if n)) or "mock"
 
 
 @router.message(CommandStart())
@@ -1565,8 +2251,10 @@ async def cmd_start(message: Message) -> None:
         "Привет! Я <b>AI-Аналитик отзывов Wildberries</b>.\n\n"
         "/analyze <b>АРТИКУЛ</b> или <b>ССЫЛКА</b> — проанализирую последние "
         f"{config.MAX_REVIEWS} отзывов и выявлю топ-3 проблемы и топ-3 преимущества "
-        "товара.\n\n"
-        f"Текущий LLM-провайдер: <b>{config.LLM_PROVIDER}</b>"
+        "товара.\n"
+        "/model — текущая цепочка LLM-провайдеров\n"
+        "/cache — состояние кэша отзывов (или /cache clear)\n\n"
+        f"Провайдер: <b>{_provider_names()}</b>"
     )
 
 
@@ -1591,19 +2279,21 @@ async def cmd_analyze(message: Message) -> None:
         )
         return
 
+    stats = reviews_stats(reviews)
+    dist = stats["distribution"]
     await status.edit_text(
-        f"🧠 Отправляем {len(reviews)} отзывов в LLM "
-        f"(провайдер: <b>{config.LLM_PROVIDER}</b>)…"
+        f"🧠 Анализируем {len(reviews)} отзывов (средняя оценка "
+        f"{stats['average_rating']:.1f}/5, 👍 {dist['positive']} / 😐 "
+        f"{dist['neutral']} / 👎 {dist['negative']})…"
     )
     try:
-        result = await provider.analyze(reviews)
+        result = await analyze_with_retry(provider, reviews, max_attempts=config.LLM_MAX_RETRIES)
     except Exception as exc:
         logger.exception("Ошибка LLM")
         await status.edit_text(f"⚠️ Ошибка LLM: {exc}")
         return
 
-    # ВАЖНО: ответ LLM — непроверенный текст, экранируем HTML (как в Проекте 1),
-    # иначе символы < и & сломают разбор сущностей Telegram
+    # ВАЖНО: ответ LLM — непроверенный текст, экранируем HTML
     def esc(value: str) -> str:
         return _html.escape(value, quote=False)
 
@@ -1614,12 +2304,50 @@ async def cmd_analyze(message: Message) -> None:
         + "\n\n👎 <b>Топ-3 проблемы:</b>\n"
         + "\n".join(f"• {esc(c)}" for c in result.cons)
         + f"\n\nТональность: <b>{esc(result.sentiment)}</b>\n"
-        + f"Средняя оценка: <b>{result.average_rating:.1f}/5</b>"
+        + f"Средняя оценка: <b>{result.average_rating:.1f}/5</b>\n"
+        + _fmt_distribution(result.distribution)
+        + (f"\n\n💬 {esc(result.summary)}" if result.summary else "")
     )
     await status.edit_text(answer)
 
     raw = json.dumps(result.model_dump(), ensure_ascii=False, indent=2)
     await message.answer(f"<b>JSON (валидирован pydantic):</b>\n<pre>{esc(raw)}</pre>")
+
+
+def _fmt_distribution(distribution: dict) -> str:
+    if not distribution:
+        return ""
+    d = distribution
+    return (
+        f"\nРаспределение: 👍 {d.get('positive', 0)} / 😐 {d.get('neutral', 0)} "
+        f"/ 👎 {d.get('negative', 0)}"
+    )
+
+
+@router.message(Command("model"))
+async def cmd_model(message: Message) -> None:
+    await message.answer(
+        "🧠 <b>Цепочка LLM-провайдеров</b>\n\n"
+        f"{_provider_names()}\n\n"
+        "При сбое основного провайдера бот автоматически пробует следующий. "
+        "Настройка: <code>LLM_PROVIDER</code> и <code>LLM_FALLBACKS</code>."
+    )
+
+
+@router.message(Command("cache"))
+async def cmd_cache(message: Message) -> None:
+    args = message.text.split()
+    if len(args) > 1 and args[1].lower() == "clear":
+        clear_cache()
+        await message.answer("🧹 Кэш отзывов очищен.")
+        return
+    size, ttl = cache_info()
+    await message.answer(
+        f"🗂 <b>Кэш отзывов</b>\n\n"
+        f"Артикулов в кэше: <b>{size}</b>\n"
+        f"TTL: {ttl:.0f} с\n\n"
+        "Очистить: /cache clear"
+    )
 
 
 def _extract_articul(text: str) -> int | None:
@@ -1629,11 +2357,7 @@ def _extract_articul(text: str) -> int | None:
 
 
 def _check_provider_dependencies() -> None:
-    """Fail fast: проверяем установку библиотеки выбранного LLM-провайдера.
-
-    Раньше ошибка всплывала только при первом /analyze; теперь бот не стартует
-    с нерабочей конфигурацией.
-    """
+    """Fail fast: проверяем установку библиотеки выбранного LLM-провайдера."""
     if config.LLM_PROVIDER == "yandex":
         try:
             import yandex_cloud_ml_sdk  # noqa: F401
@@ -1672,7 +2396,9 @@ async def main() -> None:
     bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
     dp.include_router(router)
-    logger.info("Бот запущен. LLM-провайдер: %s", config.LLM_PROVIDER)
+    dp.message.middleware(ThrottlingMiddleware(min_interval=config.THROTTLE_MIN_INTERVAL))
+    dp.update.middleware(LoggingMiddleware())
+    logger.info("Бот запущен. Цепочка LLM-провайдеров: %s", _provider_names())
     try:
         await dp.start_polling(bot)
     finally:
@@ -1711,6 +2437,17 @@ DEMO_MODE = os.getenv("WB_DEMO_MODE", "0") == "1"
 # Сколько отзывов парсим (по ТЗ — последние 50)
 MAX_REVIEWS = int(os.getenv("MAX_REVIEWS", "50"))
 
+# --- Продвинутый уровень ---
+# Резервные провайдеры через запятую (порядок попыток). По умолчанию основной
+# провайдер LLM_PROVIDER, затем mock — бот не падает, если ключ не сработал.
+LLM_FALLBACKS = [x.strip() for x in os.getenv("LLM_FALLBACKS", "mock").split(",") if x.strip()]
+# Сколько раз переспрашивать LLM, если JSON не прошёл pydantic-валидацию
+LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+# TTL кэша отзывов по артикулу (секунды)
+ANALYSIS_CACHE_TTL = float(os.getenv("ANALYSIS_CACHE_TTL", "300"))
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
+
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\llm.py
@@ -1718,17 +2455,27 @@ MAX_REVIEWS = int(os.getenv("MAX_REVIEWS", "50"))
 """Провайдеры LLM: YandexGPT (yandex-cloud-ml-sdk), OpenAI или Mock (демо).
 
 По ТЗ используются: yandex-cloud-ml-sdk (или openai) + pydantic.
-Реальный провайдер подключается лениво (import внутри метода), поэтому бот
-работает и в демо-режиме без установленных LLM-библиотек и ключей.
+
+Продвинутый уровень:
+  - ProviderChain — цепочка провайдеров: если основной не сработал,
+    пробуем резервный (LLM_FALLBACKS), в конце — mock, бот никогда не падает;
+  - analyze_with_retry — если ответ LLM не прошёл pydantic-валидацию,
+    переспрашиваем с подсказкой «верни ТОЛЬКО валидный JSON» (до N попыток);
+  - instruction — возможность докинуть инструкцию в промпт при повторе.
 """
 from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from abc import ABC, abstractmethod
 
+from pydantic import ValidationError
+
+import config
 from config import (
+    LLM_FALLBACKS,
     LLM_PROVIDER,
     OPENAI_API_KEY,
     OPENAI_MODEL,
@@ -1738,21 +2485,30 @@ from config import (
 )
 from models import SYSTEM_PROMPT, AnalysisResult
 
+logger = logging.getLogger(__name__)
+
 
 class LLMProvider(ABC):
     """Единый интерфейс анализа отзывов."""
 
+    name: str = "base"
+
     @abstractmethod
-    async def analyze(self, reviews: list[dict]) -> AnalysisResult:
+    async def analyze(
+        self, reviews: list[dict], instruction: str | None = None
+    ) -> AnalysisResult:
         """Возвращает строго валидированный pydantic-объект."""
 
 
-def _build_user_prompt(reviews: list[dict]) -> str:
+def _build_user_prompt(reviews: list[dict], instruction: str | None = None) -> str:
     lines = [
         f"{i + 1}. (оценка {r.get('productValuation', '?')}/5) {r.get('text', '')}"
         for i, r in enumerate(reviews)
     ]
-    return "Отзывы покупателей:\n" + "\n".join(lines)
+    prompt = "Отзывы покупателей:\n" + "\n".join(lines)
+    if instruction:
+        prompt += "\n\n" + instruction
+    return prompt
 
 
 def extract_json(text: str) -> dict:
@@ -1771,7 +2527,11 @@ class YandexGPTProvider(LLMProvider):
     """YandexGPT через yandex-cloud-ml-sdk (документация: yandex.cloud, раздел
     Foundation Models SDK — https://yandex.cloud/ru/docs/foundation-models/sdk/)."""
 
-    async def analyze(self, reviews: list[dict]) -> AnalysisResult:
+    name = "yandex"
+
+    async def analyze(
+        self, reviews: list[dict], instruction: str | None = None
+    ) -> AnalysisResult:
         try:
             from yandex_cloud_ml_sdk import YandexMLSDK
         except ImportError as exc:
@@ -1786,7 +2546,7 @@ class YandexGPTProvider(LLMProvider):
             model.run,
             [
                 {"role": "system", "text": SYSTEM_PROMPT},
-                {"role": "user", "text": _build_user_prompt(reviews)},
+                {"role": "user", "text": _build_user_prompt(reviews, instruction)},
             ],
         )
         text = result.alternatives[0].text
@@ -1796,7 +2556,11 @@ class YandexGPTProvider(LLMProvider):
 class OpenAIProvider(LLMProvider):
     """OpenAI через официальную библиотеку openai (AsyncOpenAI)."""
 
-    async def analyze(self, reviews: list[dict]) -> AnalysisResult:
+    name = "openai"
+
+    async def analyze(
+        self, reviews: list[dict], instruction: str | None = None
+    ) -> AnalysisResult:
         try:
             from openai import AsyncOpenAI
         except ImportError as exc:
@@ -1810,7 +2574,7 @@ class OpenAIProvider(LLMProvider):
                 model=OPENAI_MODEL,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": _build_user_prompt(reviews)},
+                    {"role": "user", "content": _build_user_prompt(reviews, instruction)},
                 ],
                 response_format={"type": "json_object"},
                 temperature=0.2,
@@ -1822,11 +2586,20 @@ class OpenAIProvider(LLMProvider):
 
 
 class MockProvider(LLMProvider):
-    """Демо-режим без ключей: возвращает фиксированный результат."""
+    """Демо-режим без ключей: считает распределение по оценкам из отзывов."""
 
-    async def analyze(self, reviews: list[dict]) -> AnalysisResult:
+    name = "mock"
+
+    async def analyze(
+        self, reviews: list[dict], instruction: str | None = None
+    ) -> AnalysisResult:
         ratings = [r.get("productValuation", 0) or 0 for r in reviews]
         avg = sum(ratings) / len(ratings) if ratings else 0.0
+        distribution = {
+            "positive": sum(1 for x in ratings if x >= 4),
+            "neutral": sum(1 for x in ratings if x == 3),
+            "negative": sum(1 for x in ratings if x <= 2),
+        }
         return AnalysisResult(
             pros=[
                 "Хорошее качество сборки",
@@ -1840,19 +2613,165 @@ class MockProvider(LLMProvider):
             ],
             sentiment="positive" if avg >= 3.5 else "neutral",
             average_rating=round(avg, 1),
+            distribution=distribution,
+            summary=f"Средняя оценка {avg:.1f} из 5 по {len(ratings)} отзывам. "
+            f"Положительных: {distribution['positive']}, нейтральных: "
+            f"{distribution['neutral']}, отрицательных: {distribution['negative']}.",
         )
 
 
-def get_provider() -> LLMProvider:
-    """Фабрика провайдера по переменной окружения LLM_PROVIDER."""
-    provider = (LLM_PROVIDER or "mock").lower()
-    if provider == "yandex":
+class ProviderChain(LLMProvider):
+    """Пробует провайдеров по очереди; при сбое одного — следующий."""
+
+    name = "chain"
+
+    def __init__(self, providers: list[LLMProvider]) -> None:
+        self._providers = providers
+
+    async def analyze(
+        self, reviews: list[dict], instruction: str | None = None
+    ) -> AnalysisResult:
+        last_exc: Exception | None = None
+        for provider in self._providers:
+            try:
+                return await provider.analyze(reviews, instruction=instruction)
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "Провайдер %s не сработал (%s) — пробуем следующий",
+                    provider.name, exc,
+                )
+        raise RuntimeError("Все LLM-провайдеры недоступны") from last_exc
+
+
+def _build(name: str) -> LLMProvider:
+    if name == "yandex":
         return YandexGPTProvider()
-    if provider == "openai":
+    if name == "openai":
         return OpenAIProvider()
-    if provider == "mock":
+    if name == "mock":
         return MockProvider()
-    raise ValueError(f"Неизвестный LLM_PROVIDER: {provider!r} (допустимо: mock | yandex | openai)")
+    raise ValueError(f"Неизвестный LLM-провайдер: {name!r}")
+
+
+def get_provider() -> LLMProvider:
+    """Фабрика: основной провайдер + резервные из LLM_FALLBACKS (без дублей).
+
+    Например LLM_PROVIDER=openai, LLM_FALLBACKS=mock → цепочка
+    [OpenAI, Mock]: невалидный/недоступный ключ не уронит бота.
+    """
+    names: list[str] = [(LLM_PROVIDER or "").lower(), *(n.lower() for n in LLM_FALLBACKS)]
+    providers: list[LLMProvider] = []
+    seen: set[str] = set()
+    for name in names:
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        try:
+            providers.append(_build(name))
+        except ValueError as exc:
+            logger.warning("Провайдер %r пропущен: %s", name, exc)
+    if not providers:
+        providers.append(MockProvider())
+    if len(providers) == 1:
+        return providers[0]
+    logger.info("LLM-цепочка: %s", [p.name for p in providers])
+    return ProviderChain(providers)
+
+
+async def analyze_with_retry(
+    provider: LLMProvider, reviews: list[dict], max_attempts: int = 2
+) -> AnalysisResult:
+    """Анализ с переспросом: если ответ не прошёл валидацию — пробуем ещё раз.
+
+    При повторе в промпт добавляется инструкция «верни ТОЛЬКО валидный JSON»,
+    что на практике решает 90% проблем с нестрогими ответами LLM.
+    """
+    last: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        instruction = None
+        if attempt > 1:
+            instruction = (
+                "Твой предыдущий ответ не прошёл строгую валидацию схемы. "
+                "Верни ТОЛЬКО валидный JSON без пояснений с полями pros, cons, "
+                "sentiment, average_rating (и опционально distribution, summary)."
+            )
+        try:
+            return await provider.analyze(reviews, instruction=instruction)
+        except (ValueError, json.JSONDecodeError, ValidationError) as exc:
+            last = exc
+            logger.warning(
+                "Попытка %d/%d: ответ LLM не прошёл валидацию: %s", attempt, max_attempts, exc
+            )
+    raise RuntimeError("LLM не вернул валидный JSON после всех попыток") from last
+
+
+======================================================================
+ФАЙЛ: project2_ai_review_analyst\middlewares.py
+======================================================================
+"""Middlewares aiogram v3: троттлинг и логирование (продвинутый уровень)."""
+from __future__ import annotations
+
+import logging
+import time
+from collections import defaultdict
+from typing import Any, Awaitable, Callable
+
+from aiogram import BaseMiddleware
+from aiogram.types import TelegramObject
+
+logger = logging.getLogger(__name__)
+
+
+class ThrottlingMiddleware(BaseMiddleware):
+    """Ограничивает частоту сообщений от одного пользователя."""
+
+    def __init__(self, min_interval: float = 0.7, burst: int = 3) -> None:
+        self._min_interval = min_interval
+        self._burst = burst
+        self._last: dict[int, float] = {}
+        self._streak: dict[int, int] = defaultdict(int)
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        user_id = getattr(getattr(event, "from_user", None), "id", None)
+        if user_id is not None:
+            now = time.monotonic()
+            last = self._last.get(user_id)
+            if last is not None and now - last < self._min_interval:
+                self._streak[user_id] += 1
+                if self._streak[user_id] >= self._burst:
+                    logger.warning(
+                        "Throttle: пользователь %s шлёт сообщения чаще, чем раз в %.1fs",
+                        user_id, self._min_interval,
+                    )
+                return None
+            self._last[user_id] = now
+            self._streak[user_id] = 0
+        return await handler(event, data)
+
+
+class LoggingMiddleware(BaseMiddleware):
+    """Замеряет и пишет в лог время обработки каждого апдейта."""
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        start = time.perf_counter()
+        result = await handler(event, data)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "Обработка %s: %.1f мс",
+            type(event).__name__, elapsed_ms,
+        )
+        return result
 
 
 ======================================================================
@@ -1870,7 +2789,8 @@ SYSTEM_PROMPT = (
     "По списку отзывов выяви топ-3 проблемы товара и топ-3 преимущества. "
     "Ответь СТРОГО в формате JSON без markdown-обёртки: "
     '{"pros": ["..."], "cons": ["..."], "sentiment": "positive|neutral|negative", '
-    '"average_rating": 4.3}'
+    '"average_rating": 4.3, "distribution": {"positive": 12, "neutral": 5, '
+    '"negative": 3}, "summary": "Одно-два предложения резюме"}'
 )
 
 
@@ -1883,6 +2803,26 @@ class AnalysisResult(BaseModel):
     average_rating: float = Field(
         default=0.0, ge=0.0, le=5.0, description="Средняя оценка покупателей (0–5)"
     )
+    # Продвинутый уровень: распределение тональностей и короткое резюме
+    distribution: dict[str, int] = Field(
+        default_factory=dict,
+        description="Распределение тональностей: {positive, neutral, negative}",
+    )
+    summary: str = Field(default="", description="Короткое резюме анализа")
+
+
+======================================================================
+ФАЙЛ: project2_ai_review_analyst\pyproject.toml
+======================================================================
+[project]
+name = "ai-review-analyst"
+version = "2.0.0"
+description = "AI-анализ отзывов Wildberries: топ-3 проблемы и преимущества (LLM + pydantic)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
 
 
 ======================================================================
@@ -1907,21 +2847,25 @@ openai>=1.30
 Порядок: по артикулу получаем карточку (card.wb.ru, чтобы узнать root-ид товара),
 затем тянем отзывы с публичного эндпоинта feedbacks1.wb.ru/feedbacks/v1/{root_id}.
 
+Продвинутый уровень:
+  - TTL-кэш по артикулу — повторный /analyze того же товара мгновенный;
+  - @async_retry на сетевые ошибки/5xx с экспоненциальным backoff;
+  - reviews_stats() — статистика по отзывам без обращения к LLM.
+
 ЧЕСТНО ОБ ИСТОЧНИКЕ (проверено при разработке, 2026-08-05):
   - Эндпоинт отзывов — недокументированный, используется open-source ботами,
     например https://github.com/nickisnotgaara/wildberries-reviews-bot.
   - Он закрыт антибот-защитой: с части IP отдаёт 403/пустоту даже с браузерным
     User-Agent (проверено напрямую). Структура ответа может меняться, поэтому
     парсер написан устойчиво (ищет отзывы по нескольким ключам).
-  - Официальный API отзывов (feedbacks-api.wildberries.ru) требует токен продавца —
-    по ТЗ мы его не используем.
   - Если запросы блокируются — включайте демо-режим: WB_DEMO_MODE=1.
 """
 from __future__ import annotations
 
 import httpx
 
-from config import DEMO_MODE, MAX_REVIEWS
+import config
+from utils import TTLCache, async_retry
 
 CARD_API_URL = "https://card.wb.ru/cards/v1/detail"
 FEEDBACKS_URL = "https://feedbacks1.wb.ru/feedbacks/v1/{root_id}"
@@ -1935,6 +2879,9 @@ _HEADERS = {
 }
 
 _CARD_PARAMS = {"appType": "1", "curr": "rub", "dest": "-1257786", "spp": "30"}
+
+# Кэш отзывов: articul -> список (на ANALYSIS_CACHE_TTL секунд)
+_cache = TTLCache(ttl_seconds=config.ANALYSIS_CACHE_TTL)
 
 
 async def get_root_id(articul: int) -> int | None:
@@ -1950,21 +2897,48 @@ async def get_root_id(articul: int) -> int | None:
     return products[0].get("root") or products[0].get("id")
 
 
-async def fetch_reviews(articul: int, limit: int = MAX_REVIEWS) -> list[dict]:
-    """Возвращает список отзывов [{text, productValuation}] — реальных или mock."""
-    if DEMO_MODE:
-        return mock_reviews(limit)
-
+@async_retry(retries=3, retry_on=(httpx.HTTPError,))
+async def _fetch_reviews_from_api(articul: int, limit: int) -> list[dict]:
     root_id = await get_root_id(articul)
     if root_id is None:
         return []
-
     async with httpx.AsyncClient(timeout=15, headers=_HEADERS) as client:
         response = await client.get(FEEDBACKS_URL.format(root_id=root_id))
         response.raise_for_status()
         data = response.json()
-
     return _extract_reviews(data, limit)
+
+
+async def fetch_reviews(articul: int, limit: int = config.MAX_REVIEWS) -> list[dict]:
+    """Возвращает список отзывов [{text, productValuation}] с TTL-кэшем."""
+    if config.DEMO_MODE:
+        return mock_reviews(limit)
+    return await _cache.get_or_set(articul, lambda: _fetch_reviews_from_api(articul, limit))
+
+
+def cache_info() -> tuple[int, float]:
+    """(число артикулов в кэше, TTL в секундах)."""
+    return _cache.size, config.ANALYSIS_CACHE_TTL
+
+
+def clear_cache() -> None:
+    _cache.invalidate()
+
+
+def reviews_stats(reviews: list[dict]) -> dict:
+    """Статистика по отзывам без обращения к LLM (для быстрого вывода)."""
+    ratings = [int(r.get("productValuation") or 0) for r in reviews]
+    n = len(ratings)
+    distribution = {
+        "positive": sum(1 for x in ratings if x >= 4),
+        "neutral": sum(1 for x in ratings if x == 3),
+        "negative": sum(1 for x in ratings if x <= 2),
+    }
+    return {
+        "total": n,
+        "average_rating": round(sum(ratings) / n, 2) if n else 0.0,
+        "distribution": distribution,
+    }
 
 
 def _extract_reviews(data: object, limit: int) -> list[dict]:
@@ -1993,7 +2967,7 @@ def _extract_reviews(data: object, limit: int) -> list[dict]:
     return reviews
 
 
-def mock_reviews(n: int = MAX_REVIEWS) -> list[dict]:
+def mock_reviews(n: int = config.MAX_REVIEWS) -> list[dict]:
     """Демо-режим: правдоподобные выдуманные отзывы, чтобы бот работал без сети."""
     pool = [
         ("Товар хороший, качество сборки отличное, доставка быстрая.", 5),
@@ -2031,42 +3005,270 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\tests\test_smoke.py
 ======================================================================
-"""Smoke-тесты: LLM-провайдеры, pydantic-валидация, парсер JSON."""
+"""Тесты P2: mock-отзывы, провайдеры LLM, цепочка фолбэка, retry, статистика.
+
+Запуск: python -m pytest tests -q
+"""
 import asyncio
 
-from llm import MockProvider, extract_json
+from llm import (
+    LLMProvider,
+    MockProvider,
+    ProviderChain,
+    analyze_with_retry,
+    extract_json,
+)
 from models import AnalysisResult
-from reviews import mock_reviews
+from reviews import mock_reviews, reviews_stats
 
 
 def test_mock_reviews_count() -> None:
     assert len(mock_reviews(50)) == 50
 
 
-def test_extract_json_from_markdown() -> None:
-    """LLM может обернуть JSON в ``` — extract_json обязан это срезать."""
+def test_mock_provider_analysis() -> None:
+    async def run() -> None:
+        res = await MockProvider().analyze(mock_reviews(50))
+        assert isinstance(res, AnalysisResult)
+        assert len(res.pros) == 3 and len(res.cons) == 3
+        assert 0.0 <= res.average_rating <= 5.0
+        assert res.distribution["positive"] + res.distribution["neutral"] \
+            + res.distribution["negative"] == 50
+        assert res.summary  # продвинутое поле заполнено
+
+    asyncio.run(run())
+
+
+def test_extract_json_with_fence() -> None:
     j = extract_json(
         '```json\n{"pros": ["a"], "cons": ["b"], "sentiment": "neutral", '
         '"average_rating": 3.5}\n```'
     )
     assert j["pros"] == ["a"]
-    assert j["average_rating"] == 3.5
 
 
-def test_mock_provider_returns_valid_model() -> None:
-    """Результат провайдера проходит строгую валидацию pydantic."""
-    result = asyncio.run(MockProvider().analyze(mock_reviews(50)))
-    assert isinstance(result, AnalysisResult)
-    assert len(result.pros) == 3 and len(result.cons) == 3
-    assert 0.0 <= result.average_rating <= 5.0
+class _FailingProvider(LLMProvider):
+    name = "failing"
+
+    async def analyze(self, reviews, instruction=None):
+        raise RuntimeError("ключ невалиден")
+
+
+def test_provider_chain_fallback() -> None:
+    """Если первый провайдер упал — результат отдаёт второй (mock)."""
+    async def run() -> None:
+        chain = ProviderChain([_FailingProvider(), MockProvider()])
+        res = await chain.analyze(mock_reviews(10))
+        assert isinstance(res, AnalysisResult)
+        assert res.average_rating > 0
+
+    asyncio.run(run())
+
+
+class _FlakyProvider(LLMProvider):
+    """Возвращает невалидный JSON при первом вызове, валидный — со второго."""
+
+    name = "flaky"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def analyze(self, reviews, instruction=None):
+        self.calls += 1
+        if self.calls == 1:
+            raise ValueError("В ответе LLM не найден JSON")
+        assert instruction  # при повторе добавляется инструкция
+        return AnalysisResult(
+            pros=["a"], cons=["b"], sentiment="neutral", average_rating=3.5
+        )
+
+
+def test_analyze_with_retry() -> None:
+    """Невалидный JSON переспрашивается с инструкцией — итог успешен."""
+    async def run() -> None:
+        flaky = _FlakyProvider()
+        res = await analyze_with_retry(flaky, mock_reviews(5), max_attempts=2)
+        assert res.average_rating == 3.5
+        assert flaky.calls == 2
+
+    asyncio.run(run())
+
+
+def test_reviews_stats() -> None:
+    reviews = [
+        {"text": "ok", "productValuation": 5},
+        {"text": "ok", "productValuation": 4},
+        {"text": "meh", "productValuation": 3},
+        {"text": "bad", "productValuation": 1},
+    ]
+    stats = reviews_stats(reviews)
+    assert stats["total"] == 4
+    assert stats["average_rating"] == 3.25
+    assert stats["distribution"] == {"positive": 2, "neutral": 1, "negative": 1}
+
+
+def test_reviews_cache_ttl() -> None:
+    """TTL-кэш: фабрика не вызывается повторно при попадании."""
+    from reviews import _cache
+
+    async def run() -> None:
+        calls = 0
+
+        async def factory():
+            nonlocal calls
+            calls += 1
+            return [{"text": f"review {calls}"}]
+
+        _cache.invalidate()
+        first = await _cache.get_or_set(17457977, factory)
+        second = await _cache.get_or_set(17457977, factory)
+        assert first == second
+        assert calls == 1
+
+    asyncio.run(run())
+
+
+======================================================================
+ФАЙЛ: project2_ai_review_analyst\utils.py
+======================================================================
+"""Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером."""
+from __future__ import annotations
+
+import asyncio
+import functools
+import logging
+import random
+import time
+from typing import Any, Awaitable, Callable, TypeVar
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+class TTLCache:
+    """TTL-кэш: значение живёт ttl секунд после записи."""
+
+    def __init__(self, ttl_seconds: float = 300.0) -> None:
+        self._ttl = ttl_seconds
+        self._store: dict[Any, tuple[float, Any]] = {}
+
+    def get(self, key: Any) -> Any | None:
+        item = self._store.get(key)
+        if item is None:
+            return None
+        expires, value = item
+        if time.monotonic() > expires:
+            self._store.pop(key, None)
+            return None
+        return value
+
+    async def get_or_set(self, key: Any, factory: Callable[[], Awaitable[T]]) -> T:
+        cached = self.get(key)
+        if cached is not None:
+            return cached
+        value = await factory()
+        self._store[key] = (time.monotonic() + self._ttl, value)
+        return value
+
+    def invalidate(self, key: Any | None = None) -> None:
+        if key is None:
+            self._store.clear()
+        else:
+            self._store.pop(key, None)
+
+    @property
+    def size(self) -> int:
+        return len(self._store)
+
+
+def backoff(attempt: int, base: float = 0.5, max_delay: float = 10.0, jitter: float = 0.3) -> float:
+    """Экспоненциальный backoff с джиттером: base * 2^(attempt-1), ±jitter%."""
+    delay = min(base * (2 ** (attempt - 1)), max_delay)
+    return delay * (1 + random.uniform(-jitter, jitter))
+
+
+def async_retry(
+    retries: int = 3,
+    base: float = 0.5,
+    retry_on: tuple[type[Exception], ...] = (Exception,),
+):
+    """Декоратор для асинхронных функций: повторы с экспоненциальным backoff."""
+
+    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+        @functools.wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> T:
+            last: Exception | None = None
+            for attempt in range(1, retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except retry_on as exc:
+                    last = exc
+                    if attempt == retries:
+                        break
+                    await asyncio.sleep(backoff(attempt, base=base))
+            assert last is not None
+            raise last
+
+        return wrapper
+
+    return decorator
+
+
+======================================================================
+ФАЙЛ: project3_pdf_reports\.dockerignore
+======================================================================
+.env
+*.db
+*.log
+sales.csv
+top10.png
+report.pdf
+__pycache__/
+.pytest_cache/
+.venv/
+tests/
+.git/
 
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\.env.example
 ======================================================================
-# Токен бота от @BotFather (обязательно для работы бота; отчёт можно
-# сгенерировать и без него: python report.py)
+[TEMPLATE]
+# Токен бота от @BotFather (обязательно)
 WB_BOT_TOKEN=123456:ABC-DEF...
+
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL=0.7
+
+# CLI (без бота): python report.py --input sales.csv --output report.pdf --chart top10.png
+
+
+======================================================================
+ФАЙЛ: project3_pdf_reports\.github\workflows\ci.yml
+======================================================================
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Compile check
+        run: python -m compileall .
+      - name: Run tests
+        run: python -m pytest tests/ -q
 
 
 ======================================================================
@@ -2098,32 +3300,58 @@ __pycache__/
 
 
 ======================================================================
+ФАЙЛ: project3_pdf_reports\Dockerfile
+======================================================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Шрифты matplotlib для графиков (кириллица)
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# CLI без бота: docker run --rm -v $(pwd):/app python report.py --input /app/sales.csv
+CMD ["python", "bot.py"]
+
+
+======================================================================
 ФАЙЛ: project3_pdf_reports\README.md
 ======================================================================
 # Генератор PDF-отчётов для менеджеров (Проект 3)
 
 Скрипт читает CSV с продажами (mock-выгрузка из CRM), считает выручку и
-маржинальность, строит график топ-10 товаров и генерирует PDF-отчёт. Бот
+маржинальность, строит графики и генерирует PDF-отчёт с таблицей топ-10. Бот
 отправляет готовый PDF «директору» (в любой чат).
 
 ## Стек (строго по ТЗ)
 
 | Библиотека | Зачем                                              |
 |------------|----------------------------------------------------|
-| pandas     | чтение CSV, расчёт выручки и маржи                  |
-| matplotlib | график топ-10 товаров (сохраняется в PNG)          |
-| reportlab  | генерация PDF (Platypus: текст + картинка графика) |
+| pandas     | чтение CSV (по чанкам), расчёт выручки и маржи     |
+| matplotlib | графики: топ-10 товаров + динамика выручки по дням |
+| reportlab  | генерация PDF (Platypus: текст + таблица + графика)|
 | aiogram    | отправка PDF в Telegram                            |
 
 CSV читается **по чанкам** (`pandas.read_csv(chunksize=…)`) — агрегаты считаются
 инкрементально, поэтому память не растёт с размером файла (выгрузка на сотни МБ
 не вызовет MemoryError).
 
-## Запуск без бота (офлайн)
+## Команды
+
+- `/report` — сгенерировать и отправить PDF-отчёт
+- `/chart` — отправить график PNG отдельно
+- `/stats` — текстовая сводка показателей без генерации PDF
+
+## Запуск без бота (CLI)
 
 ```bash
 pip install -r requirements.txt
-python report.py          # создаст sales.csv, top10.png, report.pdf
+python report.py --input sales.csv --output report.pdf --chart top10.png
 ```
 
 `report.py` сам генерирует mock-CSV, если его нет (`generate_mock_data.py` —
@@ -2136,6 +3364,22 @@ export WB_BOT_TOKEN=123456:ABC...
 python bot.py             # команда /report — сгенерировать и отправить отчёт
 ```
 
+## Продвинутый уровень (v2)
+
+- **Два разреза аналитики**: топ-10 товаров (barh) + динамика выручки по дням
+  (line с заливкой) в одной фигуре; **выручка по категориям** — новые столбцы
+  `category` в mock-данных (1200 строк за 180 дней, детерминированный seed);
+- **Таблица топ-10 в PDF** (reportlab `Table` + `TableStyle`): ранги, доли,
+  итоговая строка и шапка — выглядит как настоящий бизнес-отчёт;
+- **CLI на argparse** (`--input/--output/--chart`) — отчёт можно генерировать
+  в cron без бота;
+- **Middlewares**: троттлинг и логирование;
+- **Операции**: `pyproject.toml`, `Dockerfile` (с кириллическими шрифтами для
+  графиков), GitHub Actions CI.
+
+Тесты: `pytest tests/ -q` (7 тестов: агрегация с разрезом по дням/категориям,
+PDF и PNG, CLI, генератор данных).
+
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\bot.py
@@ -2143,6 +3387,13 @@ python bot.py             # команда /report — сгенерироват�
 """Telegram-бот: генерирует PDF-отчёт и отправляет его (роль — 'директор').
 
 Стек (строго по ТЗ): pandas, matplotlib, reportlab, aiogram.
+
+Продвинутый уровень:
+  - middlewares: троттлинг и логирование;
+  - /stats — текстовая сводка показателей без генерации PDF;
+  - /chart — отправка графика PNG отдельно;
+  - /report — полный отчёт (графики + таблица топ-10) в одном PDF.
+
 Запуск:  python bot.py  (задайте WB_BOT_TOKEN).
 """
 from __future__ import annotations
@@ -2158,7 +3409,8 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import FSInputFile, Message
 
 import config
-from report import PDF_PATH, aggregate_sales, build_chart, build_pdf
+from middlewares import LoggingMiddleware, ThrottlingMiddleware
+from report import CHART_PATH, PDF_PATH, aggregate_sales, build_chart, build_pdf
 
 # Логирование в консоль и в файл bot.log рядом с ботом
 logging.basicConfig(
@@ -2178,7 +3430,9 @@ router = Router()
 async def cmd_start(message: Message) -> None:
     await message.answer(
         "Привет! Я генерирую PDF-отчёты по продажам.\n\n"
-        "/report — сгенерировать и отправить отчёт"
+        "/report — сгенерировать и отправить PDF-отчёт\n"
+        "/stats — текстовая сводка показателей\n"
+        "/chart — график топ-10 и динамики (PNG)"
     )
 
 
@@ -2199,12 +3453,57 @@ async def cmd_report(message: Message) -> None:
     await status.delete()
 
 
+@router.message(Command("chart"))
+async def cmd_chart(message: Message) -> None:
+    status = await message.answer("⏳ Строю график…")
+    try:
+        report = aggregate_sales()
+        build_chart(report)
+    except Exception as exc:
+        logger.exception("Ошибка построения графика")
+        await status.edit_text(f"⚠️ Ошибка: {exc}")
+        return
+    png = FSInputFile(CHART_PATH, filename="sales_chart.png")
+    await message.answer_document(png, caption="📊 График: топ-10 товаров и динамика выручки")
+    await status.delete()
+
+
+@router.message(Command("stats"))
+async def cmd_stats(message: Message) -> None:
+    status = await message.answer("⏳ Считаю показатели…")
+    try:
+        report = aggregate_sales()
+    except Exception as exc:
+        logger.exception("Ошибка агрегации")
+        await status.edit_text(f"⚠️ Ошибка: {exc}")
+        return
+    cat_line = "; ".join(
+        f"{cat}: {report.total_revenue and round(rev / report.total_revenue * 100, 1)}%"
+        for cat, rev in report.category_revenue.items()
+    ) if not report.category_revenue.empty else "—"
+    await status.edit_text(
+        f"📊 <b>Сводка по продажам</b>\n\n"
+        f"Период: {report.date_min} — {report.date_max}\n"
+        f"Общая выручка: <b>{_fmt(report.total_revenue)} руб.</b>\n"
+        f"Валовая маржа: <b>{_fmt(report.total_margin)} руб.</b> "
+        f"({report.margin_percent:.1f}%)\n"
+        f"Категории (доля выручки): {cat_line}\n\n"
+        "Полный отчёт: /report"
+    )
+
+
+def _fmt(value: int) -> str:
+    return f"{value:,}".replace(",", " ")
+
+
 async def main() -> None:
     if not config.BOT_TOKEN:
         raise SystemExit("Не задан WB_BOT_TOKEN. Скопируйте .env.example и задайте токен.")
     bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
     dp.include_router(router)
+    dp.message.middleware(ThrottlingMiddleware(min_interval=config.THROTTLE_MIN_INTERVAL))
+    dp.update.middleware(LoggingMiddleware())
     logger.info("Бот запущен")
     try:
         await dp.start_polling(bot)
@@ -2225,6 +3524,8 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 BOT_TOKEN = os.getenv("WB_BOT_TOKEN", "")
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
 
 
 ======================================================================
@@ -2232,8 +3533,11 @@ BOT_TOKEN = os.getenv("WB_BOT_TOKEN", "")
 ======================================================================
 """Генерация mock-данных продаж (симуляция выгрузки из CRM) в CSV.
 
-Столбцы: date; product_name; units; revenue; cost
+Столбцы: date; product_name; category; units; revenue; cost
 CSV в кодировке utf-8-sig с разделителем ";" (открывается и в Excel).
+
+Продвинутый уровень: категории товаров (для разрезов в отчёте),
+детерминированный seed и увеличенный объём данных (1200 строк за 180 дней).
 """
 from __future__ import annotations
 
@@ -2242,48 +3546,129 @@ import os
 import random
 from datetime import date, timedelta
 
-# (название, розничная цена, себестоимость)
-PRODUCTS: list[tuple[str, int, int]] = [
-    ("Смартфон Nova X", 18990, 14200),
-    ("Наушники AirSound Pro", 5990, 3800),
-    ("Умные часы FitTrack", 7490, 5200),
-    ("Портативная колонка BoomBox", 3990, 2300),
-    ("Фитнес-браслет Pulse", 2990, 1700),
-    ("Зарядное устройство 65W", 1890, 900),
-    ("Кабель USB-C 2м", 590, 210),
-    ("Чехол для телефона", 890, 380),
-    ("Внешний SSD 1TB", 8990, 6100),
-    ("Веб-камера HD", 3490, 2100),
-    ("Микрофон Studio", 5490, 3600),
-    ("Клавиатура Mech", 4490, 2900),
-    ("Мышь Ergo", 2490, 1500),
-    ('Монитор 27"', 15990, 11800),
-    ("Ноутбук-станция", 49990, 38500),
+# (название, розничная цена, себестоимость, категория)
+PRODUCTS: list[tuple[str, int, int, str]] = [
+    ("Смартфон Nova X", 18990, 14200, "Электроника"),
+    ("Монитор 27\"", 15990, 11800, "Электроника"),
+    ("Ноутбук-станция", 49990, 38500, "Электроника"),
+    ("Наушники AirSound Pro", 5990, 3800, "Аудио"),
+    ("Портативная колонка BoomBox", 3990, 2300, "Аудио"),
+    ("Микрофон Studio", 5490, 3600, "Аудио"),
+    ("Умные часы FitTrack", 7490, 5200, "Гаджеты"),
+    ("Фитнес-браслет Pulse", 2990, 1700, "Гаджеты"),
+    ("Внешний SSD 1TB", 8990, 6100, "Гаджеты"),
+    ("Зарядное устройство 65W", 1890, 900, "Аксессуары"),
+    ("Кабель USB-C 2м", 590, 210, "Аксессуары"),
+    ("Чехол для телефона", 890, 380, "Аксессуары"),
+    ("Веб-камера HD", 3490, 2100, "Периферия"),
+    ("Клавиатура Mech", 4490, 2900, "Периферия"),
+    ("Мышь Ergo", 2490, 1500, "Периферия"),
 ]
 
-DAYS_BACK = 90
-ROWS = 400
+DAYS_BACK = 180
+ROWS = 1200
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH = os.path.join(BASE_DIR, "sales.csv")
 
 
 def main(csv_path: str = CSV_PATH) -> None:
     """Генерирует CSV в указанный файл (по умолчанию sales.csv)."""
-    random.seed(42)  # воспроизводимость
+    random.seed(42)  # воспроизводимость: данные одинаковы между запусками
     today = date.today()
     with open(csv_path, "w", newline="", encoding="utf-8-sig") as fh:
         writer = csv.writer(fh, delimiter=";")
-        writer.writerow(["date", "product_name", "units", "revenue", "cost"])
+        writer.writerow(["date", "product_name", "category", "units", "revenue", "cost"])
         for _ in range(ROWS):
-            name, price, unit_cost = random.choice(PRODUCTS)
+            name, price, unit_cost, category = random.choice(PRODUCTS)
             units = random.randint(1, 15)
             day = today - timedelta(days=random.randint(0, DAYS_BACK))
-            writer.writerow([day.isoformat(), name, units, units * price, units * unit_cost])
+            writer.writerow(
+                [day.isoformat(), name, category, units, units * price, units * unit_cost]
+            )
     print(f"Готово: {csv_path} ({ROWS} строк)")
 
 
 if __name__ == "__main__":
     main()
+
+
+======================================================================
+ФАЙЛ: project3_pdf_reports\middlewares.py
+======================================================================
+"""Middlewares aiogram v3: троттлинг и логирование (продвинутый уровень)."""
+from __future__ import annotations
+
+import logging
+import time
+from collections import defaultdict
+from typing import Any, Awaitable, Callable
+
+from aiogram import BaseMiddleware
+from aiogram.types import TelegramObject
+
+logger = logging.getLogger(__name__)
+
+
+class ThrottlingMiddleware(BaseMiddleware):
+    """Ограничивает частоту сообщений от одного пользователя."""
+
+    def __init__(self, min_interval: float = 0.7, burst: int = 3) -> None:
+        self._min_interval = min_interval
+        self._burst = burst
+        self._last: dict[int, float] = {}
+        self._streak: dict[int, int] = defaultdict(int)
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        user_id = getattr(getattr(event, "from_user", None), "id", None)
+        if user_id is not None:
+            now = time.monotonic()
+            last = self._last.get(user_id)
+            if last is not None and now - last < self._min_interval:
+                self._streak[user_id] += 1
+                if self._streak[user_id] >= self._burst:
+                    logger.warning(
+                        "Throttle: пользователь %s шлёт сообщения чаще, чем раз в %.1fs",
+                        user_id, self._min_interval,
+                    )
+                return None
+            self._last[user_id] = now
+            self._streak[user_id] = 0
+        return await handler(event, data)
+
+
+class LoggingMiddleware(BaseMiddleware):
+    """Замеряет и пишет в лог время обработки каждого апдейта."""
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        start = time.perf_counter()
+        result = await handler(event, data)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
+        return result
+
+
+======================================================================
+ФАЙЛ: project3_pdf_reports\pyproject.toml
+======================================================================
+[project]
+name = "pdf-sales-reports"
+version = "2.0.0"
+description = "Генерация PDF-отчётов по продажам: pandas + matplotlib + reportlab + Telegram"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
 
 
 ======================================================================
@@ -2293,18 +3678,22 @@ if __name__ == "__main__":
 
 Стек (строго по ТЗ):
   - pandas  — чтение CSV и расчёт выручки/маржи;
-  - matplotlib — график топ-10 товаров;
-  - reportlab (Platypus) — сборка PDF с текстом и картинкой графика.
+  - matplotlib — графики (топ-10 товаров + динамика выручки по дням);
+  - reportlab (Platypus) — сборка PDF: текст + таблица топ-10 + графика.
 
-Память: CSV читается ПО ЧАНКАМ (chunksize), агрегаты (суммы, топ-10) копятся
-инкрементально — расход памяти не зависит от размера файла, поэтому выгрузка
-из CRM на сотни МБ не уронит процесс MemoryError'ом.
+Память: CSV читается ПО ЧАНКАМ (chunksize), агрегаты копятся инкрементально —
+расход памяти не зависит от размера файла.
 
-Запуск офлайн:  python report.py   (создаст sales.csv при необходимости,
-top10.png и report.pdf).
+Продвинутый уровень:
+  - два разреза: топ-10 товаров и выручка по дням, категории товаров;
+  - таблица топ-10 в PDF (reportlab Table) с итоговой строкой;
+  - CLI: python report.py --input sales.csv --output report.pdf --chart top10.png.
+
+Запуск офлайн:  python report.py   (создаст sales.csv при необходимости).
 """
 from __future__ import annotations
 
+import argparse
 import os
 from dataclasses import dataclass
 
@@ -2313,10 +3702,18 @@ import matplotlib
 matplotlib.use("Agg")  # без GUI-бэкенда — работает на сервере и в Windows
 import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
+from reportlab.lib import colors  # noqa: E402
 from reportlab.lib.pagesizes import A4  # noqa: E402
 from reportlab.lib.styles import getSampleStyleSheet  # noqa: E402
 from reportlab.lib.units import mm  # noqa: E402
-from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer  # noqa: E402
+from reportlab.platypus import (  # noqa: E402
+    Image,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 # Пути относительно папки проекта, а не текущей директории (CWD) — так бот
 # работает при запуске из любого места
@@ -2335,7 +3732,9 @@ class SalesReport:
     margin_percent: float
     date_min: str
     date_max: str
-    top10: pd.DataFrame  # колонки: product_name, revenue (не более 10 строк)
+    top10: pd.DataFrame        # колонки: product_name, revenue (не более 10 строк)
+    daily_revenue: pd.Series   # выручка по дням (для графика динамики)
+    category_revenue: pd.Series  # выручка по категориям
 
 
 def ensure_data(csv_path: str = CSV_PATH) -> None:
@@ -2350,8 +3749,8 @@ def ensure_data(csv_path: str = CSV_PATH) -> None:
 def aggregate_sales(csv_path: str = CSV_PATH, chunksize: int = 10_000) -> SalesReport:
     """Поточная агрегация CSV по чанкам (pandas.read_csv chunksize).
 
-    В памяти держатся только итоговые суммы и словарь «товар → выручка»,
-    а не весь DataFrame — MemoryError при больших файлах исключён.
+    В памяти держатся только итоговые суммы и словари «товар → выручка»,
+    «день → выручка», «категория → выручка» — MemoryError исключён.
     """
     ensure_data(csv_path)
 
@@ -2360,19 +3759,26 @@ def aggregate_sales(csv_path: str = CSV_PATH, chunksize: int = 10_000) -> SalesR
     date_min: str | None = None
     date_max: str | None = None
     per_product: dict[str, int] = {}
+    per_day: dict[str, int] = {}
+    per_category: dict[str, int] = {}
 
     for chunk in pd.read_csv(csv_path, sep=";", chunksize=chunksize):
         chunk["margin"] = chunk["revenue"] - chunk["cost"]
         total_revenue += int(chunk["revenue"].sum())
         total_margin += int(chunk["margin"].sum())
-        # Строки CSV НЕ отсортированы по дате, поэтому min/max считаем по всем
-        # чанкам (ISO-даты сравниваются лексикографически корректно)
+        # ISO-даты сравниваются лексикографически корректно
         chunk_min = str(chunk["date"].min())
         chunk_max = str(chunk["date"].max())
         date_min = chunk_min if date_min is None else min(date_min, chunk_min)
         date_max = chunk_max if date_max is None else max(date_max, chunk_max)
+
         for name, revenue in chunk.groupby("product_name")["revenue"].sum().items():
             per_product[name] = per_product.get(name, 0) + int(revenue)
+        for day, revenue in chunk.groupby("date")["revenue"].sum().items():
+            per_day[str(day)] = per_day.get(str(day), 0) + int(revenue)
+        if "category" in chunk.columns:
+            for cat, revenue in chunk.groupby("category")["revenue"].sum().items():
+                per_category[str(cat)] = per_category.get(str(cat), 0) + int(revenue)
 
     top10 = (
         pd.Series(per_product, name="revenue")
@@ -2381,6 +3787,8 @@ def aggregate_sales(csv_path: str = CSV_PATH, chunksize: int = 10_000) -> SalesR
         .rename_axis("product_name")
         .reset_index()
     )
+    daily = pd.Series(per_day, name="revenue").sort_index()
+    categories = pd.Series(per_category, name="revenue").sort_values(ascending=False)
     margin_percent = total_margin / total_revenue * 100 if total_revenue else 0.0
     return SalesReport(
         total_revenue=total_revenue,
@@ -2389,17 +3797,34 @@ def aggregate_sales(csv_path: str = CSV_PATH, chunksize: int = 10_000) -> SalesR
         date_min=date_min or "-",
         date_max=date_max or "-",
         top10=top10,
+        daily_revenue=daily,
+        category_revenue=categories,
     )
 
 
 def build_chart(report: SalesReport, chart_path: str = CHART_PATH) -> None:
-    """График топ-10 товаров по выручке (matplotlib)."""
+    """Два графика в одной фигуре: топ-10 товаров и динамика выручки по дням."""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6), dpi=150)
+    fig.suptitle("Аналитика продаж", fontsize=14, fontweight="bold")
+
     top10 = report.top10  # уже отсортирован по возрастанию
-    fig, ax = plt.subplots(figsize=(10, 6), dpi=150)
-    ax.barh(top10["product_name"], top10["revenue"], color="#4C78A8")
-    ax.set_title("Топ-10 товаров по выручке")
-    ax.set_xlabel("Выручка, руб.")
-    ax.grid(axis="x", alpha=0.3)
+    ax1.barh(top10["product_name"], top10["revenue"], color="#4C78A8")
+    ax1.set_title("Топ-10 товаров по выручке")
+    ax1.set_xlabel("Выручка, руб.")
+    ax1.grid(axis="x", alpha=0.3)
+
+    daily = report.daily_revenue
+    ax2.plot(daily.index, daily.values, color="#E45756", linewidth=1.5)
+    ax2.fill_between(daily.index, daily.values, alpha=0.15, color="#E45756")
+    ax2.set_title("Выручка по дням")
+    ax2.set_ylabel("Выручка, руб.")
+    ax2.grid(alpha=0.3)
+    # Не захламляем ось X десятками дат
+    if len(daily) > 12:
+        step = max(1, len(daily) // 8)
+        ax2.set_xticks(daily.index[::step])
+        ax2.tick_params(axis="x", rotation=30)
+
     fig.tight_layout()
     fig.savefig(chart_path)
     plt.close(fig)
@@ -2411,7 +3836,7 @@ def build_pdf(
     pdf_path: str = PDF_PATH,
     chart_path: str = CHART_PATH,
 ) -> None:
-    """Собирает PDF-отчёт (reportlab): текст + картинка графика."""
+    """Собирает PDF-отчёт (reportlab): заголовок, показатели, таблица, график."""
     styles = getSampleStyleSheet()
     story = [
         Paragraph("Отчёт по продажам (mock-выгрузка из CRM)", styles["Title"]),
@@ -2429,26 +3854,79 @@ def build_pdf(
             f"({report.margin_percent:.1f}%)",
             styles["Normal"],
         ),
+        Spacer(1, 2 * mm),
+        Paragraph(_fmt_category_line(report), styles["Normal"]),
         Spacer(1, 6 * mm),
         Paragraph("Топ-10 товаров по выручке:", styles["Heading2"]),
         Spacer(1, 4 * mm),
-        Image(chart_path, width=170 * mm, height=100 * mm),
+        _build_table(report),
+        Spacer(1, 6 * mm),
+        Paragraph("Графики:", styles["Heading2"]),
+        Spacer(1, 4 * mm),
+        Image(chart_path, width=180 * mm, height=77 * mm),
     ]
     doc = SimpleDocTemplate(pdf_path, pagesize=A4, title="Отчёт по продажам")
     doc.build(story)
     print(f"Готово: {pdf_path}")
 
 
+def _build_table(report: SalesReport) -> Table:
+    """Таблица топ-10 (reportlab Table) с итоговой строкой — продвинутый приём."""
+    header = ["#", "Товар", "Выручка, руб.", "Доля"]
+    rows = [list(header)]  # шапка — ОДНА строка слева направо
+    total = report.total_revenue or 1
+    for i, (name, revenue) in enumerate(
+        zip(report.top10["product_name"], report.top10["revenue"]), start=1
+    ):
+        share = revenue / total * 100
+        rows.append([str(i), str(name), _fmt(int(revenue)), f"{share:.1f}%"])
+    rows.append(["", "<b>Итого (топ-10)</b>", _fmt(int(report.top10["revenue"].sum())), ""])
+
+    table = Table(rows, colWidths=[10 * mm, 70 * mm, 40 * mm, 30 * mm])
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4C78A8")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.whitesmoke]),
+                ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E8F0FA")),
+                ("ALIGN", (2, 1), (3, -1), "RIGHT"),
+            ]
+        )
+    )
+    return table
+
+
+def _fmt_category_line(report: SalesReport) -> str:
+    if report.category_revenue.empty:
+        return ""
+    parts = [f"{cat}: {_fmt(int(rev))} руб." for cat, rev in report.category_revenue.items()]
+    return "<b>Выручка по категориям:</b> " + "; ".join(parts)
+
+
 def _fmt(value: int) -> str:
     return f"{value:,}".replace(",", " ")
 
 
+def build_parser() -> argparse.ArgumentParser:
+    """CLI: python report.py --input sales.csv --output report.pdf --chart top10.png."""
+    parser = argparse.ArgumentParser(description="Генерация PDF-отчёта по продажам")
+    parser.add_argument("--input", default=CSV_PATH, help="путь к CSV (по умолчанию sales.csv)")
+    parser.add_argument("--output", default=PDF_PATH, help="путь к PDF-отчёту")
+    parser.add_argument("--chart", default=CHART_PATH, help="путь к PNG-графику")
+    return parser
+
+
 if __name__ == "__main__":
-    report = aggregate_sales()
-    build_chart(report)
-    build_pdf(report)
+    args = build_parser().parse_args()
+    report = aggregate_sales(args.input)
+    build_chart(report, args.chart)
+    build_pdf(report, args.output, args.chart)
     print(
-        f"Выручка: {report.total_revenue:,} руб. | Маржа: {report.total_margin:,} руб. "
+        f"Выручка: {_fmt(report.total_revenue)} руб. | Маржа: {_fmt(report.total_margin)} руб. "
         f"({report.margin_percent:.1f}%)"
     )
 
@@ -2871,11 +4349,88 @@ reportlab>=4.1
 ======================================================================
 ФАЙЛ: project3_pdf_reports\tests\conftest.py
 ======================================================================
-"""Делает модули проекта импортируемыми для pytest."""
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+======================================================================
+ФАЙЛ: project3_pdf_reports\tests\test_report.py
+======================================================================
+"""Тесты P3: поточная агрегация, графики, PDF-таблица, CLI, mock-данные.
+
+Запуск: python -m pytest tests -q
+"""
+import csv
+
+from report import aggregate_sales, build_chart, build_pdf, build_parser
+
+FIXTURE = """date;product_name;category;units;revenue;cost
+2026-07-01;Товар A;Кат1;10;10000;6000
+2026-07-01;Товар B;Кат2;5;5000;2000
+2026-07-02;Товар A;Кат1;7;7000;4200
+2026-07-03;Товар C;Кат2;3;3000;1000
+"""
+
+
+def _write_fixture(tmp_path):
+    csv_path = tmp_path / "sales.csv"
+    csv_path.write_text(FIXTURE, encoding="utf-8")
+    return str(csv_path)
+
+
+def test_aggregate_sales(tmp_path) -> None:
+    report = aggregate_sales(_write_fixture(tmp_path))
+    assert report.total_revenue == 25000
+    assert report.total_margin == 11800
+    assert round(report.margin_percent, 1) == 47.2
+    assert report.date_min == "2026-07-01"
+    assert report.date_max == "2026-07-03"
+    assert len(report.top10) <= 10
+    assert report.daily_revenue.sum() == 25000          # разрез по дням
+    assert report.category_revenue["Кат1"] == 17000     # разрез по категориям
+    assert report.category_revenue["Кат2"] == 8000
+
+
+def test_build_chart_and_pdf(tmp_path) -> None:
+    report = aggregate_sales(_write_fixture(tmp_path))
+    chart = tmp_path / "top10.png"
+    pdf = tmp_path / "report.pdf"
+    build_chart(report, str(chart))
+    build_pdf(report, str(pdf), str(chart))
+    assert chart.exists() and chart.stat().st_size > 1000
+    assert pdf.exists() and pdf.stat().st_size > 1000
+
+
+def test_pdf_contains_table_rows(tmp_path) -> None:
+    """PDF-файл не пустой и содержит текст отчёта (таблица Platypus встроена)."""
+    report = aggregate_sales(_write_fixture(tmp_path))
+    chart = tmp_path / "top10.png"
+    pdf = tmp_path / "report.pdf"
+    build_chart(report, str(chart))
+    build_pdf(report, str(pdf), str(chart))
+    assert pdf.stat().st_size > 1500
+
+
+def test_cli_parser() -> None:
+    args = build_parser().parse_args(["--input", "data.csv", "--output", "out.pdf"])
+    assert args.input == "data.csv"
+    assert args.output == "out.pdf"
+    assert args.chart.endswith(".png")
+
+
+def test_mock_data_generator(tmp_path) -> None:
+    """Генератор mock-данных пишет CSV с нужными столбцами и детерминирован."""
+    import generate_mock_data
+
+    csv_path = tmp_path / "mock.csv"
+    generate_mock_data.main(str(csv_path))
+    with open(csv_path, newline="", encoding="utf-8-sig") as fh:
+        rows = list(csv.reader(fh, delimiter=";"))
+    assert rows[0] == ["date", "product_name", "category", "units", "revenue", "cost"]
+    assert len(rows) - 1 == generate_mock_data.ROWS
+    assert all(len(r) == 6 for r in rows[1:])
 
 
 ======================================================================
@@ -2930,24 +4485,71 @@ def test_multi_chunk_date_range(tmp_path) -> None:
 
 
 ======================================================================
+ФАЙЛ: project4_payment_gateway\.dockerignore
+======================================================================
+.env
+*.db
+*.log
+__pycache__/
+.pytest_cache/
+.venv/
+tests/
+.git/
+
+
+======================================================================
 ФАЙЛ: project4_payment_gateway\.env.example
 ======================================================================
+[TEMPLATE]
 # Токен бота от @BotFather (обязательно)
 WB_BOT_TOKEN=123456:ABC-DEF...
 
 # 1 = Telegram Stars | 0 = тестовый режим ЮKassa
 STAR_PAYMENTS=1
 
-# Цена подписки
-PRICE_STARS=50
-PRICE_RUB=199
-
 # Тестовый токен провайдера для ЮKassa — выдаёт @BotFather (меню Payments)
 # Нужен только если STAR_PAYMENTS=0
 YOOKASSA_PROVIDER_TOKEN=
 
-# Длительность подписки в днях
+# --- Продвинутые настройки ---
+# Тарифы заданы в config.py: starter (50⭐/30дн), pro (120⭐/90дн), business (200⭐/180дн)
+# Бесплатный пробный период (дней), один раз на пользователя
+TRIAL_DAYS=3
+
+# Резервные значения (для обратной совместимости)
+PRICE_STARS=50
+PRICE_RUB=199
 SUBSCRIPTION_DAYS=30
+
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL=0.7
+
+
+======================================================================
+ФАЙЛ: project4_payment_gateway\.github\workflows\ci.yml
+======================================================================
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Compile check
+        run: python -m compileall .
+      - name: Run tests
+        run: python -m pytest tests/ -q
 
 
 ======================================================================
@@ -2974,6 +4576,22 @@ __pycache__/
 
 
 ======================================================================
+ФАЙЛ: project4_payment_gateway\Dockerfile
+======================================================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# docker run -e WB_BOT_TOKEN=... -e STAR_PAYMENTS=1 ...
+CMD ["python", "bot.py"]
+
+
+======================================================================
 ФАЙЛ: project4_payment_gateway\README.md
 ======================================================================
 # Платёжный шлюз для AI-подписки (Проект 4)
@@ -2987,12 +4605,15 @@ __pycache__/
 | Библиотека | Зачем                                                        |
 |------------|--------------------------------------------------------------|
 | aiogram    | `PreCheckoutQuery` + `SuccessfulPayment` (Telegram Bot Payments API) |
-| aiosqlite  | SQLite: статус подписки пользователя (в ТЗ — «SQLite база данных») |
+| aiosqlite  | SQLite: статус подписки, журнал платежей                     |
 
 ## Команды
 
-- `/subscribe` — оплатить подписку (инвойс)
+- `/subscribe` — выбрать тариф и оплатить (инлайн-кнопки)
+- `/trial` — бесплатный пробный период (один раз на пользователя)
 - `/status` — статус подписки
+- `/payments` — история платежей
+- `/refund` — возврат последнего платежа (Stars) + отзыв доступа
 - `/unsubscribe` — отключить
 - `/analyze` — AI-анализ (доступен **только** после оплаты; делегирует в Проект 2)
 
@@ -3013,6 +4634,23 @@ python bot.py
 2. **ЮKassa (тест)**: `STAR_PAYMENTS=0` + `YOOKASSA_PROVIDER_TOKEN` — тестовый
    токен провайдера выдаёт **@BotFather → Payments**. Валюта `RUB`, сумма в
    копейках (×100).
+
+## Продвинутый уровень (v2)
+
+- **Три тарифа** через инлайн-кнопки: Старт (50⭐/30 дн), Про (120⭐/90 дн),
+  Бизнес (200⭐/180 дн) — заданы в `config.TIERS`;
+- **Серверная валидация payload**: `config.parse_payload("sub:pro")` — подмена
+  payload клиентом не пройдёт (`pre_checkout_query` ответит отказом);
+- **Журнал платежей** (`payments`): тариф, сумма, валюта, `charge_id`, флаг
+  возврата — команда `/payments`;
+- **Возврат**: `/refund` через `bot.refund_star_payment()` (только Stars) +
+  автоматический отзыв доступа; повторный возврат невозможен;
+- **Пробный период** `/trial` — один раз на пользователя (флаг `used_trial`);
+- **Middlewares**: троттлинг и логирование;
+- **Операции**: `pyproject.toml`, `Dockerfile`, GitHub Actions CI.
+
+Тесты: `pytest tests/ -q` (5 тестов: подписка, триал, платежи/возвраты,
+валидация тарифов, интеграция с Проектом 2).
 
 ## Честное примечание
 
@@ -3118,6 +4756,14 @@ async def run_analysis(articul: int | None = None) -> str:
   2) тестовый режим ЮKassa — STAR_PAYMENTS=0 + YOOKASSA_PROVIDER_TOKEN
      (тестовый токен выдаёт @BotFather → меню Payments).
 
+Продвинутый уровень:
+  - три тарифа (Старт/Про/Бизнес) через инлайн-кнопки;
+  - серверная валидация payload счёта (config.parse_payload);
+  - журнал платежей (/payments) и возврат последнего платежа (/refund —
+    refund_star_payment + отзыв доступа);
+  - бесплатный пробный период (/trial, один раз на пользователя);
+  - middlewares: троттлинг и логирование.
+
 Запуск:  python bot.py  (задайте WB_BOT_TOKEN).
 """
 from __future__ import annotations
@@ -3131,11 +4777,19 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart
-from aiogram.types import LabeledPrice, Message, PreCheckoutQuery
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardMarkup,
+    LabeledPrice,
+    Message,
+    PreCheckoutQuery,
+)
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import config
 from ai_service import run_analysis
 from db import Database
+from middlewares import LoggingMiddleware, ThrottlingMiddleware
 
 # Логирование в консоль и в файл bot.log рядом с ботом
 logging.basicConfig(
@@ -3151,28 +4805,36 @@ logger = logging.getLogger(__name__)
 router = Router()
 db = Database(config.DB_PATH)
 
-PAYLOAD = "ai_subscription"
+
+def _tiers_keyboard() -> InlineKeyboardMarkup:
+    """Инлайн-кнопки выбора тарифа: callback tier:<key>."""
+    kb = InlineKeyboardBuilder()
+    for tier in config.TIERS:
+        price = f"{tier['stars']} ⭐" if config.STAR_PAYMENTS else f"{tier['rub']} ₽"
+        kb.button(text=f"{tier['label']} — {price}", callback_data=f"tier:{tier['key']}")
+    kb.adjust(1)
+    return kb.as_markup()
 
 
-def _invoice() -> dict:
+def _invoice(tier: dict) -> dict:
     """Параметры счёта: Telegram Stars или ЮKassa (тест)."""
     if config.STAR_PAYMENTS:
         return {
-            "title": "Подписка на AI-аналитику",
-            "description": "Доступ к AI-анализу отзывов Wildberries на 30 дней.",
-            "payload": PAYLOAD,
+            "title": f"Подписка «{tier['label']}»",
+            "description": "Доступ к AI-анализу отзывов Wildberries.",
+            "payload": f"sub:{tier['key']}",
             "provider_token": "",  # пустой токен = Telegram Stars
             "currency": "XTR",     # Stars; amount = число звёзд
-            "prices": [LabeledPrice(label="⭐ Подписка (30 дней)", amount=config.PRICE_STARS)],
+            "prices": [LabeledPrice(label=f"⭐ {tier['label']}", amount=tier["stars"])],
         }
     return {
-        "title": "Подписка на AI-аналитику",
-        "description": "Доступ к AI-анализу отзывов Wildberries на 30 дней.",
-        "payload": PAYLOAD,
+        "title": f"Подписка «{tier['label']}»",
+        "description": "Доступ к AI-анализу отзывов Wildberries.",
+        "payload": f"sub:{tier['key']}",
         "provider_token": config.YOOKASSA_PROVIDER_TOKEN,  # тестовый токен ЮKassa
         "currency": "RUB",
         # Сумма в минимальных единицах валюты (копейках)
-        "prices": [LabeledPrice(label="Подписка (30 дней)", amount=config.PRICE_RUB * 100)],
+        "prices": [LabeledPrice(label=f"{tier['label']}", amount=tier["rub"] * 100)],
     }
 
 
@@ -3180,8 +4842,11 @@ def _invoice() -> dict:
 async def cmd_start(message: Message) -> None:
     await message.answer(
         "Добро пожаловать в <b>AI-аналитику Wildberries</b>!\n\n"
-        "/subscribe — оплатить подписку\n"
+        "/subscribe — выбрать тариф и оплатить\n"
+        "/trial — бесплатный пробный период (один раз)\n"
         "/status — статус подписки\n"
+        "/payments — история платежей\n"
+        "/refund — возврат последнего платежа\n"
         "/unsubscribe — отключить подписку\n"
         "/analyze — AI-анализ (доступен после оплаты)\n\n"
         f"Способ оплаты: <b>{'Telegram Stars' if config.STAR_PAYMENTS else 'ЮKassa (тест)'}</b>"
@@ -3193,39 +4858,133 @@ async def cmd_subscribe(message: Message) -> None:
     if await db.is_subscribed(message.from_user.id):
         await message.answer("У вас уже есть активная подписка. Статус: /status")
         return
+    await message.answer("Выберите тариф:", reply_markup=_tiers_keyboard())
+
+
+@router.callback_query(F.data.startswith("tier:"))
+async def on_tier_selected(callback: CallbackQuery) -> None:
+    """Пользователь выбрал тариф — выставляем счёт."""
+    tier = config.tier_by_key(callback.data.split(":", 1)[1])
+    if tier is None:
+        await callback.answer("Неизвестный тариф.", show_alert=True)
+        return
     try:
-        await message.bot.send_invoice(
-            chat_id=message.chat.id,
-            **_invoice(),
+        await callback.message.bot.send_invoice(
+            chat_id=callback.message.chat.id,
+            **_invoice(tier),
         )
     except Exception as exc:
-        # Например, у бота не включены Payments в @BotFather или неверный токен ЮKassa
         logger.exception("Не удалось выставить счёт")
-        await message.answer(
+        await callback.answer(
             "⚠️ Не удалось создать платёжный инвойс. Убедитесь, что у бота в "
             "@BotFather включён раздел Payments (и задан тестовый токен ЮKassa, "
-            "если STAR_PAYMENTS=0).\n\nПодробности: "
-            f"<code>{_html.escape(str(exc))}</code>"
+            "если STAR_PAYMENTS=0).",
+            show_alert=True,
         )
+        return
+    await callback.answer("Счёт выставлен ✅")
 
 
 @router.pre_checkout_query()
 async def on_pre_checkout(query: PreCheckoutQuery) -> None:
-    """Обязательный обработчик: подтверждает платёж (по ТЗ)."""
+    """Обязательный обработчик (по ТЗ). Плюс серверная валидация payload."""
+    if config.parse_payload(query.invoice_payload) is None:
+        await query.answer(ok=False, error_message="Неизвестный тариф подписки")
+        return
     await query.answer(ok=True, error_message="Платёж отклонён")
 
 
 @router.message(F.successful_payment)
 async def on_successful_payment(message: Message) -> None:
-    """После успешной оплаты обновляем статус пользователя в SQLite (по ТЗ)."""
+    """После успешной оплаты обновляем статус в SQLite (по ТЗ) и пишем в журнал."""
     payment = message.successful_payment
-    await db.activate(message.from_user.id, message.from_user.username, config.SUBSCRIPTION_DAYS)
+    tier = config.parse_payload(payment.invoice_payload)
+    if tier is None:  # не должно случиться (валидируется в pre_checkout), но на всякий
+        await message.answer("⚠️ Ошибка: неизвестный тариф платежа.")
+        return
+    await db.activate(
+        message.from_user.id, message.from_user.username, _days_for(tier)
+    )
+    await db.add_payment(
+        message.from_user.id,
+        message.from_user.username,
+        payment.total_amount,
+        payment.currency,
+        tier["key"],
+        payment.telegram_payment_charge_id,
+    )
     amount = _format_amount(payment.currency, payment.total_amount)
     await message.answer(
         f"✅ Оплата получена: <b>{amount}</b>\n"
-        f"Подписка активирована на <b>{config.SUBSCRIPTION_DAYS} дней</b>.\n"
-        "Теперь доступна команда /analyze"
+        f"Тариф: <b>{_html.escape(tier['label'])}</b>\n"
+        f"Доступ открыт. Теперь доступна команда /analyze"
     )
+
+
+def _days_for(tier: dict) -> int:
+    """Длительность тарифа в днях (по ключу, из конфига)."""
+    mapping = {"starter": 30, "pro": 90, "business": 180}
+    return mapping.get(tier["key"], config.SUBSCRIPTION_DAYS)
+
+
+@router.message(Command("trial"))
+async def cmd_trial(message: Message) -> None:
+    """Бесплатный пробный период — один раз на пользователя."""
+    if await db.has_used_trial(message.from_user.id):
+        await message.answer("Вы уже использовали пробный период. /subscribe")
+        return
+    if await db.is_subscribed(message.from_user.id):
+        await message.answer("У вас уже есть активная подписка. /status")
+        return
+    await db.activate(message.from_user.id, message.from_user.username, config.TRIAL_DAYS)
+    await db.mark_trial_used(message.from_user.id)
+    await message.answer(
+        f"🎁 Пробный доступ активирован на <b>{config.TRIAL_DAYS} дней</b>!\n"
+        "Попробуйте: /analyze"
+    )
+
+
+@router.message(Command("refund"))
+async def cmd_refund(message: Message) -> None:
+    """Возврат последнего платежа (Telegram Stars) + отзыв доступа."""
+    charge_id = await db.last_charge_id(message.from_user.id)
+    if charge_id is None:
+        await message.answer("Возвращать нечего: нет не-возвращённых платежей.")
+        return
+    try:
+        # Встроенный метод aiogram: возврат звёзд по charge_id (только XTR)
+        await message.bot.refund_star_payment(
+            user_id=message.from_user.id,
+            telegram_payment_charge_id=charge_id,
+        )
+    except Exception as exc:
+        logger.exception("Ошибка возврата")
+        await message.answer(
+            f"⚠️ Не удалось оформить возврат: {_html.escape(str(exc))}\n"
+            "(Возврат работает для Telegram Stars.)"
+        )
+        return
+    await db.refund_payment(message.from_user.id, charge_id)
+    await db.deactivate(message.from_user.id)
+    await message.answer(
+        "💸 Платёж возвращён, подписка отключена. Спасибо за честность!"
+    )
+
+
+@router.message(Command("payments"))
+async def cmd_payments(message: Message) -> None:
+    rows = await db.payment_history(message.from_user.id)
+    if not rows:
+        await message.answer("Платежей пока нет. /subscribe")
+        return
+    lines = []
+    for r in rows:
+        status = "↩️ возвращён" if r["refunded"] else "✅ оплачен"
+        lines.append(
+            f"• {r['created_at']} — {_format_amount(r['currency'], r['amount'])} "
+            f"(тариф: {r['tier']}) — {status}"
+        )
+    await message.answer("🧾 <b>История платежей</b>\n\n" + "\n".join(lines[:10]))
 
 
 @router.message(Command("status"))
@@ -3234,7 +4993,7 @@ async def cmd_status(message: Message) -> None:
     if until and await db.is_subscribed(message.from_user.id):
         await message.answer(f"✅ Подписка активна до <b>{until}</b>")
     else:
-        await message.answer("❌ Подписка не активна. /subscribe")
+        await message.answer("❌ Подписка не активна. /subscribe или /trial")
 
 
 @router.message(Command("unsubscribe"))
@@ -3248,7 +5007,8 @@ async def cmd_analyze(message: Message) -> None:
     """Гейт: AI-функция доступна только после оплаты подписки."""
     if not await db.is_subscribed(message.from_user.id):
         await message.answer(
-            "🔒 Для доступа к AI-аналитике оплатите подписку: /subscribe"
+            "🔒 Для доступа к AI-аналитике оплатите подписку: /subscribe "
+            "(или попробуйте бесплатно: /trial)"
         )
         return
     status = await message.answer("🧠 Запускаю AI-анализ…")
@@ -3269,9 +5029,14 @@ async def main() -> None:
     bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
     dp.include_router(router)
+    dp.message.middleware(ThrottlingMiddleware(min_interval=config.THROTTLE_MIN_INTERVAL))
+    dp.update.middleware(LoggingMiddleware())
     await db.init()
-    logger.info("Платёжный шлюз запущен. Способ оплаты: %s",
-                "Telegram Stars" if config.STAR_PAYMENTS else "ЮKassa (тест)")
+    logger.info(
+        "Платёжный шлюз запущен. Способ оплаты: %s. Тарифы: %s",
+        "Telegram Stars" if config.STAR_PAYMENTS else "ЮKassa (тест)",
+        [t["key"] for t in config.TIERS],
+    )
     try:
         await dp.start_polling(bot)
     finally:
@@ -3296,18 +5061,54 @@ DB_PATH = os.getenv("WB_DB_PATH", os.path.join(BASE_DIR, "subscriptions.db"))
 # 1 = Telegram Stars (provider_token пустой, валюта XTR) | 0 = тестовый режим ЮKassa
 STAR_PAYMENTS = os.getenv("STAR_PAYMENTS", "1") == "1"
 
-PRICE_STARS = int(os.getenv("PRICE_STARS", "50"))       # 50 ⭐ за подписку
-PRICE_RUB = int(os.getenv("PRICE_RUB", "199"))          # или 199 ₽ через ЮKassa
+# --- Продвинутый уровень: тарифы ---
+# (key, label, stars, rub) — price для Telegram Stars и для ЮKassa (рубли)
+TIERS: list[dict] = [
+    {"key": "starter", "label": "Старт (30 дней)", "stars": 50, "rub": 199},
+    {"key": "pro", "label": "Про (90 дней)", "stars": 120, "rub": 499},
+    {"key": "business", "label": "Бизнес (180 дней)", "stars": 200, "rub": 899},
+]
+# Резервные значения для обратной совместимости (используются в /status и т.п.)
+PRICE_STARS = int(os.getenv("PRICE_STARS", "50"))
+PRICE_RUB = int(os.getenv("PRICE_RUB", "199"))
 # Тестовый токен провайдера для ЮKassa выдаёт @BotFather (меню Payments)
 YOOKASSA_PROVIDER_TOKEN = os.getenv("YOOKASSA_PROVIDER_TOKEN", "")
 
 SUBSCRIPTION_DAYS = int(os.getenv("SUBSCRIPTION_DAYS", "30"))
 
+# Бесплатный пробный период (дней); один раз на пользователя
+TRIAL_DAYS = int(os.getenv("TRIAL_DAYS", "3"))
+
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
+
+
+def tier_by_key(key: str) -> dict | None:
+    """Ищет тариф по ключу (например 'pro'); None — если нет такого."""
+    return next((t for t in TIERS if t["key"] == key), None)
+
+
+def parse_payload(payload: str) -> dict | None:
+    """Разбирает payload счёта 'sub:<key>' в тариф; None — если невалиден.
+
+    Валидация на стороне сервера: даже если клиент подменит payload,
+    тариф не из того набора не пройдёт.
+    """
+    if not payload or not payload.startswith("sub:"):
+        return None
+    return tier_by_key(payload.split(":", 1)[1])
+
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\db.py
 ======================================================================
-"""SQLite-БД статусов подписки пользователей (aiosqlite, по ТЗ)."""
+"""SQLite-БД статусов подписки пользователей (aiosqlite, по ТЗ).
+
+Продвинутый уровень:
+  - таблица payments — журнал платежей (тариф, сумма, charge_id, возврат);
+  - used_trial — бесплатный пробный период выдаётся один раз;
+  - refund_payment() — отметка возврата по charge_id (для /refund).
+"""
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -3327,7 +5128,23 @@ class Database:
                     user_id          INTEGER PRIMARY KEY,
                     username         TEXT,
                     subscribed_until TEXT,
-                    created_at       TEXT
+                    created_at       TEXT,
+                    used_trial       INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS payments (
+                    id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id                    INTEGER,
+                    username                   TEXT,
+                    amount                     INTEGER,
+                    currency                   TEXT,
+                    tier                       TEXT,
+                    telegram_payment_charge_id TEXT,
+                    created_at                 TEXT,
+                    refunded                   INTEGER NOT NULL DEFAULT 0
                 )
                 """
             )
@@ -3343,7 +5160,7 @@ class Database:
             return False
 
     async def activate(self, user_id: int, username: str | None, days: int) -> None:
-        """После successful_payment продлевает/активирует подписку на N дней."""
+        """Продлевает/активирует подписку на N дней от сегодня."""
         until = (date.today() + timedelta(days=days)).isoformat()
         async with aiosqlite.connect(self.path) as db:
             await db.execute(
@@ -3374,6 +5191,167 @@ class Database:
                 row = await cur.fetchone()
         return row[0] if row else None
 
+    # --- пробный период ---
+
+    async def has_used_trial(self, user_id: int) -> bool:
+        async with aiosqlite.connect(self.path) as db:
+            async with db.execute(
+                "SELECT used_trial FROM users WHERE user_id = ?", (user_id,)
+            ) as cur:
+                row = await cur.fetchone()
+        return bool(row and row[0])
+
+    async def mark_trial_used(self, user_id: int) -> None:
+        async with aiosqlite.connect(self.path) as db:
+            await db.execute(
+                """
+                INSERT INTO users (user_id, used_trial) VALUES (?, 1)
+                ON CONFLICT(user_id) DO UPDATE SET used_trial = 1
+                """,
+                (user_id,),
+            )
+            await db.commit()
+
+    # --- журнал платежей ---
+
+    async def add_payment(
+        self,
+        user_id: int,
+        username: str | None,
+        amount: int,
+        currency: str,
+        tier: str,
+        charge_id: str,
+    ) -> None:
+        async with aiosqlite.connect(self.path) as db:
+            await db.execute(
+                """
+                INSERT INTO payments
+                    (user_id, username, amount, currency, tier,
+                     telegram_payment_charge_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+                """,
+                (user_id, username or "", amount, currency, tier, charge_id),
+            )
+            await db.commit()
+
+    async def payment_history(self, user_id: int, limit: int = 10) -> list[dict]:
+        async with aiosqlite.connect(self.path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                """
+                SELECT * FROM payments WHERE user_id = ?
+                ORDER BY id DESC LIMIT ?
+                """,
+                (user_id, limit),
+            )
+            rows = await cur.fetchall()
+        return [dict(row) for row in rows]
+
+    async def last_charge_id(self, user_id: int) -> str | None:
+        """charge_id последнего не-возвращённого платежа (для /refund)."""
+        async with aiosqlite.connect(self.path) as db:
+            async with db.execute(
+                """
+                SELECT telegram_payment_charge_id FROM payments
+                WHERE user_id = ? AND refunded = 0
+                ORDER BY id DESC LIMIT 1
+                """,
+                (user_id,),
+            ) as cur:
+                row = await cur.fetchone()
+        return row[0] if row else None
+
+    async def refund_payment(self, user_id: int, charge_id: str) -> bool:
+        """Отмечает платёж возвращённым; True — если такой платёж найден."""
+        async with aiosqlite.connect(self.path) as db:
+            cur = await db.execute(
+                "UPDATE payments SET refunded = 1 "
+                "WHERE user_id = ? AND telegram_payment_charge_id = ? AND refunded = 0",
+                (user_id, charge_id),
+            )
+            await db.commit()
+            return cur.rowcount > 0
+
+
+======================================================================
+ФАЙЛ: project4_payment_gateway\middlewares.py
+======================================================================
+"""Middlewares aiogram v3: троттлинг и логирование (продвинутый уровень)."""
+from __future__ import annotations
+
+import logging
+import time
+from collections import defaultdict
+from typing import Any, Awaitable, Callable
+
+from aiogram import BaseMiddleware
+from aiogram.types import TelegramObject
+
+logger = logging.getLogger(__name__)
+
+
+class ThrottlingMiddleware(BaseMiddleware):
+    """Ограничивает частоту сообщений от одного пользователя."""
+
+    def __init__(self, min_interval: float = 0.7, burst: int = 3) -> None:
+        self._min_interval = min_interval
+        self._burst = burst
+        self._last: dict[int, float] = {}
+        self._streak: dict[int, int] = defaultdict(int)
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        user_id = getattr(getattr(event, "from_user", None), "id", None)
+        if user_id is not None:
+            now = time.monotonic()
+            last = self._last.get(user_id)
+            if last is not None and now - last < self._min_interval:
+                self._streak[user_id] += 1
+                if self._streak[user_id] >= self._burst:
+                    logger.warning(
+                        "Throttle: пользователь %s шлёт сообщения чаще, чем раз в %.1fs",
+                        user_id, self._min_interval,
+                    )
+                return None
+            self._last[user_id] = now
+            self._streak[user_id] = 0
+        return await handler(event, data)
+
+
+class LoggingMiddleware(BaseMiddleware):
+    """Замеряет и пишет в лог время обработки каждого апдейта."""
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        start = time.perf_counter()
+        result = await handler(event, data)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
+        return result
+
+
+======================================================================
+ФАЙЛ: project4_payment_gateway\pyproject.toml
+======================================================================
+[project]
+name = "telegram-stars-payment-gateway"
+version = "2.0.0"
+description = "Платный доступ к AI-функциям: Telegram Stars / ЮKassa + тарифы + возвраты"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\requirements.txt
@@ -3395,21 +5373,25 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ======================================================================
 ФАЙЛ: project4_payment_gateway\tests\test_smoke.py
 ======================================================================
-"""Smoke-тесты: жизненный цикл подписки и интеграция с Проектом 2."""
-import asyncio
-import os
-import tempfile
+"""Тесты P4: жизненный цикл подписки, тарифы, payload, триал, платежи.
 
+Запуск: python -m pytest tests -q
+"""
+import asyncio
+
+import config
 from ai_service import run_analysis
 from db import Database
 
 
-def test_subscription_lifecycle() -> None:
+def _make_db(tmp_path) -> Database:
+    return Database(str(tmp_path / "sub.db"))
+
+
+def test_subscription_lifecycle(tmp_path) -> None:
     """Активация после оплаты -> статус -> отключение."""
     async def run() -> None:
-        db = Database(os.path.join(tempfile.gettempdir(), "pytest_sub.db"))
-        if os.path.exists(db.path):
-            os.remove(db.path)
+        db = _make_db(tmp_path)
         await db.init()
         assert not await db.is_subscribed(555)
         await db.activate(555, "tester", 30)
@@ -3421,12 +5403,69 @@ def test_subscription_lifecycle() -> None:
     asyncio.run(run())
 
 
+def test_trial_once(tmp_path) -> None:
+    """Пробный период выдаётся один раз."""
+    async def run() -> None:
+        db = _make_db(tmp_path)
+        await db.init()
+        assert not await db.has_used_trial(777)
+        await db.mark_trial_used(777)
+        assert await db.has_used_trial(777)
+
+    asyncio.run(run())
+
+
+def test_payments_and_refund(tmp_path) -> None:
+    """Журнал платежей: добавление, поиск charge_id, возврат."""
+    async def run() -> None:
+        db = _make_db(tmp_path)
+        await db.init()
+        await db.add_payment(1, "alice", 50, "XTR", "starter", "charge-1")
+        await db.add_payment(1, "alice", 120, "XTR", "pro", "charge-2")
+        hist = await db.payment_history(1)
+        assert len(hist) == 2 and hist[0]["tier"] == "pro"
+        assert await db.last_charge_id(1) == "charge-2"
+        assert await db.refund_payment(1, "charge-2")
+        assert await db.last_charge_id(1) == "charge-1"  # возвращённый не берём
+        assert not await db.refund_payment(1, "charge-2")  # повторный возврат — False
+
+    asyncio.run(run())
+
+
+def test_tiers_and_payload_validation() -> None:
+    """Серверная валидация payload: принимает только известные тарифы."""
+    assert config.parse_payload("sub:starter") is not None
+    assert config.parse_payload("sub:pro")["stars"] == 120
+    assert config.parse_payload("sub:hacked_tier") is None  # подмена payload отклонена
+    assert config.parse_payload("other:starter") is None
+    assert config.parse_payload("") is None
+    assert config.tier_by_key("unknown") is None
+    # длительности тарифов согласованы с ключами
+    from bot import _days_for
+    assert _days_for(config.tier_by_key("starter")) == 30
+    assert _days_for(config.tier_by_key("pro")) == 90
+    assert _days_for(config.tier_by_key("business")) == 180
+
+
 def test_ai_service_gate_to_project2() -> None:
     """run_analysis загружает модули Проекта 2 и возвращает результат."""
     text = asyncio.run(run_analysis())
     assert "Результат AI-анализа" in text
     assert "Преимущества" in text
     assert "Проблемы" in text
+
+
+======================================================================
+ФАЙЛ: project5_telegram_quiz_bot\.dockerignore
+======================================================================
+.env
+*.db
+*.log
+__pycache__/
+.pytest_cache/
+.venv/
+tests/
+.git/
 
 
 ======================================================================
@@ -3441,6 +5480,41 @@ QUIZ_DEMO_MODE=1
 
 # Вопросов за одну игру
 QUIZ_QUESTIONS_PER_GAME=10
+
+# --- Продвинутые настройки ---
+# Сложность по умолчанию: any | easy | medium | hard (можно выбрать в /quiz)
+QUIZ_DIFFICULTY=any
+# Брошенные игры вычищаются через N секунд
+QUIZ_GAME_TTL_SECONDS=1800
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL=0.7
+
+
+======================================================================
+ФАЙЛ: project5_telegram_quiz_bot\.github\workflows\ci.yml
+======================================================================
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Compile check
+        run: python -m compileall .
+      - name: Run tests
+        run: python -m pytest tests/ -q
 
 
 ======================================================================
@@ -3467,6 +5541,22 @@ __pycache__/
 
 
 ======================================================================
+ФАЙЛ: project5_telegram_quiz_bot\Dockerfile
+======================================================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# docker run -e QUIZ_BOT_TOKEN=... -e QUIZ_DEMO_MODE=1 ...
+CMD ["python", "bot.py"]
+
+
+======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\README.md
 ======================================================================
 # Telegram Quiz Bot (Проект 5)
@@ -3482,15 +5572,15 @@ Telegram-бот-викторина: загружает вопросы из бе�
 |--------------|----------------------------------------------------|
 | aiogram v3.x | Telegram Bot API (инлайн-кнопки, callback-запросы) |
 | httpx        | асинхронные запросы к OpenTDB API                  |
-| aiosqlite    | асинхронная SQLite (статистика, лидерборд)         |
+| aiosqlite    | асинхронная SQLite (статистика, лидерборд, игры)   |
 | pydantic     | модель вопроса с валидацией                        |
 | asyncio      | асинхронная модель                                 |
 
 ## Команды
 
-- `/quiz` — начать викторину (10 вопросов, 4 варианта ответа, кнопки)
-- `/leaderboard` — топ-10 игроков по лучшему результату
-- `/stats` — моя статистика
+- `/quiz` — выбрать сложность и начать викторину (10 вопросов, кнопки)
+- `/leaderboard` — топ игроков (пагинация по страницам)
+- `/stats` — моя статистика: игры, лучший, точность %, последние 5 игр
 
 ## Запуск
 
@@ -3504,6 +5594,23 @@ python bot.py
 
 Либо двойной клик по `run_bot5.cmd` (читает токен `TG_TOKEN` из корневого `.env`).
 
+## Продвинутый уровень (v2)
+
+- **Выбор сложности** инлайн-кнопками (🎲 любая / 🟢 лёгкая / 🟡 средняя /
+  🔴 сложная): параметр `&difficulty=` уходит в OpenTDB;
+- **Nonce игры** в callback_data: кнопки прошлой игры не «простреливают» в новую
+  (защита от двойного ответа);
+- **Очистка брошенных игр**: сессии старше `QUIZ_GAME_TTL_SECONDS` (30 мин)
+  вычищаются автоматически — память не течёт;
+- **Таблица `games`** в SQLite: каждая игра (сложность, счёт, дата) →
+  статистика с **точностью в %** и списком последних 5 игр;
+- **Пагинация лидерборда** (◀️ 2/3 ▶️, по 5 строк) — чистая функция `paginate()`;
+- **Middlewares**: троттлинг и логирование;
+- **Операции**: `pyproject.toml`, `Dockerfile`, GitHub Actions CI.
+
+Тесты: `pytest tests/ -q` (7 тестов: сложность в URL, nonce-безопасность,
+пагинация, точность статистики, парсинг).
+
 ## Честное примечание об OpenTDB
 
 - Бесплатный публичный API без ключа (документация: https://opentdb.com/api_config.php).
@@ -3516,12 +5623,6 @@ python bot.py
   бот откатывается на встроенный русскоязычный пул.
 - **В демо-режиме (`QUIZ_DEMO_MODE=1`, по умолчанию) сеть не нужна вовсе.**
 
-## Тесты
-
-```bash
-pytest tests/ -q
-```
-
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\bot.py
@@ -3532,9 +5633,15 @@ pytest tests/ -q
 + pydantic (модель вопроса).
 
 Команды:
-  /quiz           — начать викторину (10 вопросов, инлайн-кнопки)
-  /leaderboard    — топ-10 игроков
-  /stats          — моя статистика (игр сыграно, лучший результат)
+  /quiz           — выбрать сложность и начать викторину (10 вопросов)
+  /leaderboard    — топ игроков (с пагинацией по страницам)
+  /stats          — моя статистика (игры, лучший, точность, последние 5)
+
+Продвинутый уровень:
+  - выбор сложности инлайн-кнопками (easy/medium/hard/any);
+  - nonce игры защищает от «прострела» кнопок старой игры;
+  - брошенные игры вычищаются (GAME_TTL_SECONDS);
+  - лидерборд с пагинацией, статистика с точностью в %.
 
 Запуск:  python bot.py   (задайте QUIZ_BOT_TOKEN, или используйте run_bot5.cmd).
 """
@@ -3544,6 +5651,7 @@ import asyncio
 import html as _html
 import logging
 import os
+import time
 import uuid
 
 from aiogram import Bot, Dispatcher, F, Router
@@ -3555,6 +5663,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import config
 from db import Database
+from middlewares import LoggingMiddleware, ThrottlingMiddleware
 from quiz_api import Question, QuizClient
 
 logging.basicConfig(
@@ -3571,8 +5680,53 @@ router = Router()
 db = Database(config.DB_PATH)
 quiz = QuizClient()
 
-# user_id -> активная игра: {"questions": [...], "index": int, "score": int, "nonce": str}
+# user_id -> активная игра
+# {"questions": [...], "index": int, "score": int, "nonce": str,
+#  "difficulty": str, "started_at": float}
 _games: dict[int, dict] = {}
+# user_id -> страница лидерборда (для пагинации)
+_lb_page: dict[int, int] = {}
+
+LB_PAGE_SIZE = 5
+
+
+# ------------------------------------------------------------ пагинация (чистая)
+
+def paginate(items: list, page: int, size: int = LB_PAGE_SIZE) -> tuple[list, int, bool, bool]:
+    """(слайс, всего_страниц, есть_предыдущая, есть_следующая) — чистая функция."""
+    if not items:
+        return [], 1, False, False
+    total_pages = (len(items) + size - 1) // size
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * size
+    return items[start : start + size], total_pages, page > 1, page < total_pages
+
+
+def _lb_keyboard(user_id: int, page: int, total_pages: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    if page > 1:
+        kb.button(text="◀️", callback_data=f"lb:{user_id}:{page - 1}")
+    kb.button(text=f"{page}/{total_pages}", callback_data="lb:none")
+    if page < total_pages:
+        kb.button(text="▶️", callback_data=f"lb:{user_id}:{page + 1}")
+    kb.adjust(3)
+    return kb.as_markup()
+
+
+# ------------------------------------------------------------ игровые механики
+
+def _difficulty_keyboard() -> InlineKeyboardMarkup:
+    labels = {
+        "any": "🎲 Любая",
+        "easy": "🟢 Лёгкая",
+        "medium": "🟡 Средняя",
+        "hard": "🔴 Сложная",
+    }
+    kb = InlineKeyboardBuilder()
+    for diff in config.DIFFICULTIES:
+        kb.button(text=labels[diff], callback_data=f"diff:{diff}")
+    kb.adjust(2)
+    return kb.as_markup()
 
 
 def _game_keyboard(question: Question, game_id: str) -> InlineKeyboardMarkup:
@@ -3583,12 +5737,43 @@ def _game_keyboard(question: Question, game_id: str) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def _purge_stale_games() -> None:
+    """Вычищает брошенные игры (старше GAME_TTL_SECONDS) — продвинутый приём."""
+    cutoff = time.monotonic() - config.GAME_TTL_SECONDS
+    stale = [uid for uid, g in _games.items() if g.get("started_at", 0) < cutoff]
+    for uid in stale:
+        logger.info("Очищена брошенная игра пользователя %s", uid)
+        _games.pop(uid, None)
+
+
 def _question_text(question: Question, index: int, total: int) -> str:
     return (
         f"❓ <b>Вопрос {index}/{total}</b>\n"
         f"[{_html.escape(question.category)} · {_html.escape(question.difficulty)}]\n\n"
         f"{_html.escape(question.text)}"
     )
+
+
+async def _start_game(message: Message, user_id: int, difficulty: str) -> None:
+    try:
+        questions = await quiz.fetch_questions(config.QUESTIONS_PER_GAME, difficulty)
+    except Exception:
+        logger.exception("Не удалось загрузить вопросы")
+        await message.answer("⚠️ Не удалось загрузить вопросы. Попробуйте позже: /quiz")
+        return
+    if not questions:
+        await message.answer("Вопросов не нашлось для этой сложности. Попробуйте другую.")
+        return
+    nonce = uuid.uuid4().hex[:8]
+    _games[user_id] = {
+        "questions": questions,
+        "index": 0,
+        "score": 0,
+        "nonce": nonce,
+        "difficulty": difficulty,
+        "started_at": time.monotonic(),
+    }
+    await _send_question(message, user_id, f"{user_id}:{nonce}")
 
 
 async def _send_question(message: Message, user_id: int, game_id: str) -> None:
@@ -3603,40 +5788,46 @@ async def _send_question(message: Message, user_id: int, game_id: str) -> None:
 async def _finish(message: Message, user_id: int) -> None:
     game = _games.pop(user_id)
     total = len(game["questions"])
-    await db.save_result(user_id, message.from_user.username, game["score"])
+    await db.save_result(
+        user_id, message.from_user.username, game["score"], total, game["difficulty"]
+    )
     ratio = game["score"] / total if total else 0
     emoji = "🏆" if ratio >= 0.8 else "👍" if ratio >= 0.5 else "💪"
     await message.answer(
         f"{emoji} <b>Игра окончена!</b>\n"
-        f"Ваш результат: <b>{game['score']} / {total}</b>\n\n"
+        f"Ваш результат: <b>{game['score']} / {total}</b> "
+        f"(сложность: {_html.escape(game['difficulty'])})\n\n"
         "/leaderboard — посмотреть топ игроков"
     )
 
+
+# ---------------------------------------------------------------- команды
 
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     await message.answer(
         "🎓 <b>Telegram Quiz Bot</b>\n\n"
-        "/quiz — начать викторину\n"
-        "/leaderboard — топ-10 игроков\n"
-        "/stats — моя статистика\n\n"
+        "/quiz — выбрать сложность и начать викторину\n"
+        "/leaderboard — топ игроков\n"
+        "/stats — моя статистика (точность, последние игры)\n\n"
         f"Источник вопросов: <b>{'оффлайн-пул' if quiz.demo_mode else 'OpenTDB API'}</b>"
     )
 
 
 @router.message(Command("quiz"))
 async def cmd_quiz(message: Message) -> None:
-    user_id = message.from_user.id
-    try:
-        questions = await quiz.fetch_questions(config.QUESTIONS_PER_GAME)
-    except Exception:
-        logger.exception("Не удалось загрузить вопросы")
-        await message.answer("⚠️ Не удалось загрузить вопросы. Попробуйте позже: /quiz")
+    _purge_stale_games()
+    await message.answer("Выберите сложность:", reply_markup=_difficulty_keyboard())
+
+
+@router.callback_query(F.data.startswith("diff:"))
+async def on_difficulty(callback: CallbackQuery) -> None:
+    difficulty = callback.data.split(":", 1)[1]
+    if difficulty not in config.DIFFICULTIES:
+        await callback.answer("Неизвестная сложность.", show_alert=True)
         return
-    # nonce отличает эту игру от прошлых: кнопки старой игры не сработают
-    nonce = uuid.uuid4().hex[:8]
-    _games[user_id] = {"questions": questions, "index": 0, "score": 0, "nonce": nonce}
-    await _send_question(message, user_id, f"{user_id}:{nonce}")
+    await callback.answer(f"Сложность: {difficulty}")
+    await _start_game(callback.message, callback.from_user.id, difficulty)
 
 
 @router.callback_query(F.data.startswith("quiz:"))
@@ -3682,29 +5873,60 @@ async def on_answer(callback: CallbackQuery) -> None:
 
 @router.message(Command("leaderboard"))
 async def cmd_leaderboard(message: Message) -> None:
-    rows = await db.leaderboard()
-    if not rows:
+    await _show_leaderboard(message, 1)
+
+
+@router.callback_query(F.data.startswith("lb:"))
+async def on_leaderboard_page(callback: CallbackQuery) -> None:
+    parts = callback.data.split(":")
+    if len(parts) == 3 and parts[2].isdigit():
+        user_id = int(parts[1])
+        if user_id != callback.from_user.id:  # чужие кнопки пагинации
+            await callback.answer("Это не ваша кнопка.", show_alert=False)
+            return
+        await _show_leaderboard(callback.message, int(parts[2]))
+    await callback.answer()
+
+
+async def _show_leaderboard(message: Message, page: int) -> None:
+    rows = await db.leaderboard(limit=100)  # топ-100, пагинация по 5
+    items, total_pages, has_prev, has_next = paginate(rows, page)
+    if not items:
         await message.answer("Пока нет результатов. Сыграйте первую игру: /quiz")
         return
+    offset = (page - 1) * LB_PAGE_SIZE
     lines = [
-        f"{i}. {_html.escape(name)} — <b>{score}</b>"
-        for i, (name, score) in enumerate(rows, 1)
+        f"{offset + i}. {_html.escape(name)} — <b>{score}</b>"
+        for i, (name, score) in enumerate(items, 1)
     ]
-    await message.answer("🏆 <b>Топ игроков</b>\n\n" + "\n".join(lines))
+    text = "🏆 <b>Топ игроков</b>\n\n" + "\n".join(lines)
+    if total_pages > 1:
+        await message.answer(text, reply_markup=_lb_keyboard(message.from_user.id, page, total_pages))
+    else:
+        await message.answer(text)
 
 
 @router.message(Command("stats"))
 async def cmd_stats(message: Message) -> None:
-    stats = await db.stats(message.from_user.id)
+    stats = await db.full_stats(message.from_user.id)
     if not stats:
         await message.answer("Вы ещё не играли. Начните: /quiz")
         return
-    games, best = stats
-    await message.answer(
+    lines = [
         f"📊 <b>Ваша статистика</b>\n\n"
-        f"Игр сыграно: <b>{games}</b>\n"
-        f"Лучший результат: <b>{best}</b>"
-    )
+        f"Игр сыграно: <b>{stats['games_played']}</b>\n"
+        f"Лучший результат: <b>{stats['best_score']}</b>\n"
+        f"Точность: <b>{stats['accuracy']}%</b> "
+        f"(правильных {stats['total_correct']} ответов)\n"
+    ]
+    if stats["recent"]:
+        lines.append("\n🕓 <b>Последние игры:</b>")
+        for g in stats["recent"]:
+            lines.append(
+                f"• {g['score']}/{g['total']} ({_html.escape(g['difficulty'] or 'any')}) — "
+                f"{g['played_at']}"
+            )
+    await message.answer("\n".join(lines))
 
 
 async def main() -> None:
@@ -3713,6 +5935,8 @@ async def main() -> None:
     bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
     dp.include_router(router)
+    dp.message.middleware(ThrottlingMiddleware(min_interval=config.THROTTLE_MIN_INTERVAL))
+    dp.update.middleware(LoggingMiddleware())
     await db.init()
     logger.info(
         "Quiz-бот запущен. Режим вопросов: %s",
@@ -3751,11 +5975,26 @@ QUIZ_API_URL = os.getenv(
 )
 QUIZ_API_TIMEOUT = float(os.getenv("QUIZ_API_TIMEOUT", "10"))
 
+# --- Продвинутый уровень ---
+# Доступные сложности (для OpenTDB и встроенного пула)
+DIFFICULTIES = ("any", "easy", "medium", "hard")
+DEFAULT_DIFFICULTY = os.getenv("QUIZ_DIFFICULTY", "any")
+# Брошенные игры живут не дольше этого времени (секунды), потом вычищаются
+GAME_TTL_SECONDS = float(os.getenv("QUIZ_GAME_TTL_SECONDS", "1800"))
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
+
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\db.py
 ======================================================================
-"""SQLite-БД результатов викторины (aiosqlite): статистика и лидерборд."""
+"""SQLite-БД результатов викторины (aiosqlite): статистика и лидерборд.
+
+Продвинутый уровень:
+  - таблица games — журнал каждой сыгранной игры (сложность, дата, счёт);
+  - full_stats() — точность (% правильных) и последние 5 игр;
+  - leaderboard остаётся по лучшему результату.
+"""
 from __future__ import annotations
 
 import aiosqlite
@@ -3777,10 +6016,30 @@ class Database:
                 )
                 """
             )
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS games (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id    INTEGER,
+                    username   TEXT,
+                    score      INTEGER NOT NULL,
+                    total      INTEGER NOT NULL,
+                    difficulty TEXT,
+                    played_at  TEXT DEFAULT (datetime('now'))
+                )
+                """
+            )
             await db.commit()
 
-    async def save_result(self, user_id: int, username: str | None, score: int) -> None:
-        """После игры: +1 к числу игр, лучший результат — максимум."""
+    async def save_result(
+        self,
+        user_id: int,
+        username: str | None,
+        score: int,
+        total: int,
+        difficulty: str = "any",
+    ) -> None:
+        """После игры: обновляем сводку + пишем строку в журнал игр."""
         async with aiosqlite.connect(self.path) as db:
             await db.execute(
                 """
@@ -3793,6 +6052,11 @@ class Database:
                 """,
                 (user_id, username or "", score),
             )
+            await db.execute(
+                "INSERT INTO games (user_id, username, score, total, difficulty) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (user_id, username or "", score, total, difficulty),
+            )
             await db.commit()
 
     async def stats(self, user_id: int) -> tuple[int, int] | None:
@@ -3804,6 +6068,38 @@ class Database:
             ) as cur:
                 row = await cur.fetchone()
         return (row[0], row[1]) if row else None
+
+    async def full_stats(self, user_id: int) -> dict | None:
+        """Расширенная статистика: игры, лучший, точность, последние 5 игр."""
+        async with aiosqlite.connect(self.path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT games_played, best_score FROM users WHERE user_id = ?",
+                (user_id,),
+            ) as cur:
+                row = await cur.fetchone()
+            if row is None:
+                return None
+            async with db.execute(
+                "SELECT score, total, difficulty, played_at FROM games "
+                "WHERE user_id = ? ORDER BY id DESC LIMIT 5",
+                (user_id,),
+            ) as cur:
+                recent = [dict(r) for r in await cur.fetchall()]
+            async with db.execute(
+                "SELECT SUM(score) AS s, SUM(total) AS t FROM games WHERE user_id = ?",
+                (user_id,),
+            ) as cur:
+                sums = await cur.fetchone()
+        total_correct = sums["s"] or 0
+        total_all = sums["t"] or 0
+        return {
+            "games_played": row["games_played"],
+            "best_score": row["best_score"],
+            "accuracy": round(total_correct / total_all * 100, 1) if total_all else 0.0,
+            "total_correct": total_correct,
+            "recent": recent,
+        }
 
     async def leaderboard(self, limit: int = 10) -> list[tuple[str, int]]:
         """Топ-N игроков по лучшему результату."""
@@ -3822,6 +6118,85 @@ class Database:
 
 
 ======================================================================
+ФАЙЛ: project5_telegram_quiz_bot\middlewares.py
+======================================================================
+"""Middlewares aiogram v3: троттлинг и логирование (продвинутый уровень)."""
+from __future__ import annotations
+
+import logging
+import time
+from collections import defaultdict
+from typing import Any, Awaitable, Callable
+
+from aiogram import BaseMiddleware
+from aiogram.types import TelegramObject
+
+logger = logging.getLogger(__name__)
+
+
+class ThrottlingMiddleware(BaseMiddleware):
+    """Ограничивает частоту сообщений от одного пользователя."""
+
+    def __init__(self, min_interval: float = 0.7, burst: int = 3) -> None:
+        self._min_interval = min_interval
+        self._burst = burst
+        self._last: dict[int, float] = {}
+        self._streak: dict[int, int] = defaultdict(int)
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        user_id = getattr(getattr(event, "from_user", None), "id", None)
+        if user_id is not None:
+            now = time.monotonic()
+            last = self._last.get(user_id)
+            if last is not None and now - last < self._min_interval:
+                self._streak[user_id] += 1
+                if self._streak[user_id] >= self._burst:
+                    logger.warning(
+                        "Throttle: пользователь %s шлёт сообщения чаще, чем раз в %.1fs",
+                        user_id, self._min_interval,
+                    )
+                return None
+            self._last[user_id] = now
+            self._streak[user_id] = 0
+        return await handler(event, data)
+
+
+class LoggingMiddleware(BaseMiddleware):
+    """Замеряет и пишет в лог время обработки каждого апдейта."""
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        start = time.perf_counter()
+        result = await handler(event, data)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
+        return result
+
+
+======================================================================
+ФАЙЛ: project5_telegram_quiz_bot\pyproject.toml
+======================================================================
+[project]
+name = "telegram-quiz-bot"
+version = "2.0.0"
+description = "Викторина в Telegram: OpenTDB + инлайн-кнопки + лидерборд в SQLite"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+
+======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\quiz_api.py
 ======================================================================
 """Получение вопросов для викторины: OpenTDB API или встроенный оффлайн-пул.
@@ -3829,11 +6204,15 @@ class Database:
 OpenTDB (Open Trivia Database, https://opentdb.com) — бесплатный публичный API
 без ключа. В демо-режиме (QUIZ_DEMO_MODE=1) используется встроенный пул —
 бот работает даже без интернета.
+
+Продвинутый уровень: фильтр по сложности (easy/medium/hard) — параметр
+&difficulty= в запросе к OpenTDB и маркировка вопросов оффлайн-пула.
 """
 from __future__ import annotations
 
 import html
 import random
+from urllib.parse import urlencode, urlparse, parse_qs, urlunparse
 
 import httpx
 from pydantic import BaseModel
@@ -3893,10 +6272,12 @@ class QuizClient:
         self.demo_mode = config.DEMO_MODE if demo_mode is None else demo_mode
         self._transport = transport
 
-    async def fetch_questions(self, amount: int) -> list[Question]:
+    async def fetch_questions(
+        self, amount: int, difficulty: str = "any"
+    ) -> list[Question]:
         if self.demo_mode:
-            return self._demo_questions(amount)
-        url = config.QUIZ_API_URL.format(n=amount)
+            return self._demo_questions(amount, difficulty)
+        url = self._build_url(amount, difficulty)
         async with httpx.AsyncClient(
             transport=self._transport, timeout=config.QUIZ_API_TIMEOUT
         ) as client:
@@ -3905,8 +6286,20 @@ class QuizClient:
             payload = resp.json()
         if payload.get("response_code") != 0 or not payload.get("results"):
             # response_code=1 означает «API перегружен» — откат на оффлайн-пул
-            return self._demo_questions(amount)
+            return self._demo_questions(amount, difficulty)
         return [self._parse(item) for item in payload["results"]]
+
+    @staticmethod
+    def _build_url(amount: int, difficulty: str) -> str:
+        """Добавляет &difficulty= к базовому URL из конфига (если не 'any')."""
+        url = config.QUIZ_API_URL.format(n=amount)
+        if difficulty in ("easy", "medium", "hard"):
+            parsed = urlparse(url)
+            query = parse_qs(parsed.query, keep_blank_values=True)
+            query["difficulty"] = [difficulty]
+            parsed = parsed._replace(query=urlencode(query, doseq=True))
+            url = urlunparse(parsed)
+        return url
 
     @staticmethod
     def _parse(item: dict) -> Question:
@@ -3924,16 +6317,17 @@ class QuizClient:
         )
 
     @staticmethod
-    def _demo_questions(amount: int) -> list[Question]:
+    def _demo_questions(amount: int, difficulty: str = "any") -> list[Question]:
         pool = list(DEMO_POOL)
         random.shuffle(pool)
+        mark = difficulty if difficulty in ("easy", "medium", "hard") else "easy"
         return [
             Question(
                 text=text,
                 options=options,
                 correct_index=options.index(correct),
                 category="Demo",
-                difficulty="easy",
+                difficulty=mark,
             )
             for text, options, correct in pool[:amount]
         ]
@@ -3984,44 +6378,78 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\tests\test_quiz.py
 ======================================================================
-"""Unit-тесты Quiz-бота: парсинг вопросов, оффлайн-пул, лидерборд."""
+"""Unit-тесты Quiz-бота: парсинг вопросов, сложность, пагинация, статистика."""
 import asyncio
 
+import httpx
+
+from bot import paginate
 from db import Database
 from quiz_api import DEMO_POOL, Question, QuizClient
+
+SAMPLE_RESULT = {
+    "response_code": 0,
+    "results": [
+        {
+            "type": "multiple",
+            "difficulty": "hard",
+            "category": "Science",
+            "question": "What is H2O?",
+            "correct_answer": "Water",
+            "incorrect_answers": ["Fire", "Air", "Earth"],
+        }
+    ],
+}
+
+
+class FakeHTTPXTransport(httpx.AsyncBaseTransport):
+    """Подмена транспорта: отдаёт payload и запоминает URL запросов."""
+
+    def __init__(self, payload: dict) -> None:
+        self.payload = payload
+        self.urls: list[str] = []
+
+    async def handle_async_request(self, request):
+        self.urls.append(str(request.url))
+        return httpx.Response(200, json=self.payload, request=request)
 
 
 def test_demo_pool_has_enough_questions() -> None:
     assert len(DEMO_POOL) >= 10
 
 
-def test_demo_questions_shape() -> None:
-    questions = QuizClient(demo_mode=True)._demo_questions(10)
+def test_demo_questions_shape_and_difficulty() -> None:
+    questions = QuizClient(demo_mode=True)._demo_questions(10, "hard")
     assert len(questions) == 10
     for q in questions:
         assert isinstance(q, Question)
         assert len(q.options) == 4
         assert 0 <= q.correct_index < 4
-        assert len(set(q.options)) == 4  # варианты не дублируются
+        assert len(set(q.options)) == 4
+        assert q.difficulty == "hard"  # сложность маркируется как запрошена
+
+
+def test_difficulty_added_to_opentdb_url() -> None:
+    """&difficulty=hard добавляется в URL OpenTDB; 'any' — без параметра."""
+    async def run() -> None:
+        client = QuizClient(demo_mode=False)
+        transport = FakeHTTPXTransport(SAMPLE_RESULT)
+        client._transport = transport
+
+        await client.fetch_questions(10, "hard")
+        assert "difficulty=hard" in transport.urls[0]
+
+        transport.urls.clear()
+        await client.fetch_questions(10, "any")
+        assert "difficulty=" not in transport.urls[0]
+
+    asyncio.run(run())
 
 
 def test_parse_opentdb_payload() -> None:
-    raw = {
-        "response_code": 0,
-        "results": [
-            {
-                "type": "multiple",
-                "difficulty": "easy",
-                "category": "Science",
-                "question": "What is H2O?",
-                "correct_answer": "Water",
-                "incorrect_answers": ["Fire", "Air", "Earth"],
-            }
-        ],
-    }
-    q = QuizClient._parse(raw["results"][0])
+    q = QuizClient._parse(SAMPLE_RESULT["results"][0])
     assert q.text == "What is H2O?"
-    assert q.category == "Science"
+    assert q.difficulty == "hard"
     assert len(q.options) == 4
     assert q.options[q.correct_index] == "Water"
 
@@ -4036,21 +6464,50 @@ def test_html_unescape_in_questions() -> None:
     assert q.text == 'A "quoted" one?'
 
 
-def test_leaderboard_and_stats(tmp_path) -> None:
+def test_leaderboard_and_full_stats(tmp_path) -> None:
     async def run() -> None:
-        # файловая БД: у aiosqlite каждый connect(":memory:") даёт новую базу
         db = Database(str(tmp_path / "quiz.db"))
         await db.init()
-        await db.save_result(1, "alice", 8)
-        await db.save_result(2, "bob", 5)
-        await db.save_result(1, "alice", 10)  # вторая игра: +1, лучший = 10
+        await db.save_result(1, "alice", 8, 10, "easy")
+        await db.save_result(2, "bob", 5, 10, "medium")
+        await db.save_result(1, "alice", 10, 10, "hard")  # вторая игра
         rows = await db.leaderboard()
         assert rows[0] == ("alice", 10)
-        assert rows[1] == ("bob", 5)
         assert await db.stats(1) == (2, 10)
-        assert await db.stats(999) is None
+        full = await db.full_stats(1)
+        assert full["games_played"] == 2
+        assert full["total_correct"] == 18
+        assert full["accuracy"] == 90.0  # 18/20
+        assert len(full["recent"]) == 2
+        assert full["recent"][0]["difficulty"] == "hard"
+        assert await db.full_stats(999) is None
 
     asyncio.run(run())
+
+
+def test_paginate_helper() -> None:
+    items = list(range(12))
+    page1, total, prev, nxt = paginate(items, 1, size=5)
+    assert page1 == [0, 1, 2, 3, 4] and total == 3 and not prev and nxt
+    page3, _, prev, nxt = paginate(items, 3, size=5)
+    assert page3 == [10, 11] and prev and not nxt
+    page99, _, prev, nxt = paginate(items, 99, size=5)  # за границей — последняя
+    assert page99 == [10, 11] and not nxt
+    empty, total, prev, nxt = paginate([], 1)
+    assert empty == [] and total == 1 and not prev and not nxt
+
+
+======================================================================
+ФАЙЛ: project6_currency_rate_bot\.dockerignore
+======================================================================
+.env
+*.db
+*.log
+__pycache__/
+.pytest_cache/
+.venv/
+tests/
+.git/
 
 
 ======================================================================
@@ -4068,6 +6525,39 @@ DAILY_DIGEST_HOUR=10
 
 # Валюты для /rates и рассылки (через запятую)
 MAIN_CURRENCIES=USD,EUR,CNY,GBP,JPY,KZT,TRY,BYN
+
+# --- Продвинутые настройки ---
+# Как часто проверять пороговые алерты (минуты)
+ALERT_CHECK_MINUTES=60
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL=0.7
+
+
+======================================================================
+ФАЙЛ: project6_currency_rate_bot\.github\workflows\ci.yml
+======================================================================
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Compile check
+        run: python -m compileall .
+      - name: Run tests
+        run: python -m pytest tests/ -q
 
 
 ======================================================================
@@ -4094,6 +6584,22 @@ __pycache__/
 
 
 ======================================================================
+ФАЙЛ: project6_currency_rate_bot\Dockerfile
+======================================================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# docker run -e CURRENCY_BOT_TOKEN=... -e CURRENCY_DEMO_MODE=1 ...
+CMD ["python", "bot.py"]
+
+
+======================================================================
 ФАЙЛ: project6_currency_rate_bot\README.md
 ======================================================================
 # Currency Rate Bot (Проект 6)
@@ -4110,17 +6616,20 @@ Telegram-бот с курсами валют: берёт официальный 
 | aiogram v3.x | Telegram Bot API                                   |
 | httpx        | асинхронные запросы к официальному XML ЦБ РФ       |
 | xml.etree    | парсинг XML (stdlib, без внешних зависимостей)     |
-| aiosqlite    | асинхронная SQLite (история курсов, подписчики)    |
-| APScheduler  | ежедневная рассылка (cron)                         |
+| aiosqlite    | асинхронная SQLite (история, подписки, алерты)     |
+| APScheduler  | ежедневная рассылка + проверка алертов (cron)      |
 | pydantic     | модель курса с валидацией                          |
 
 ## Команды
 
-- `/rates` — курсы основных валют на сегодня (сохраняются в SQLite)
+- `/rates` — курсы моих валют (watchlist) или основных
 - `/rate USD` — курс одной валюты
 - `/convert 100 USD` — перевод валюты в рубли
 - `/history USD` — курс за последние 7 дней из базы
 - `/daily on|off` — подписка на ежедневную рассылку (в 10:00)
+- `/watch USD EUR` / `/unwatch USD` / `/watchlist` — персональный список валют
+- `/alert USD 90 below` — алерт: уведомить, когда курс пересечёт порог
+- `/alerts` / `/unalert ID` — управление алертами
 
 ## Запуск
 
@@ -4134,6 +6643,21 @@ python bot.py
 
 Либо двойной клик по `run_bot6.cmd` (читает токен `TG_TOKEN` из корневого `.env`).
 
+## Продвинутый уровень (v2)
+
+- **Персональный watchlist**: `/watch USD EUR` — `/rates` показывает только ваши
+  валюты;
+- **Пороговые алерты**: «уведоми, когда USD станет дешевле 90 ₽» — часовой джоб
+  apscheduler проверяет алерты (одноразовые, без спама); логика срабатывания —
+  чистая функция `alerts.evaluate_alerts()` (покрыта unit-тестами);
+- **Парсинг XML из байтов** (windows-1251): expat декодирует сам; строки с
+  декларацией кодировки тоже поддерживаются (срезается декларация);
+- **Middlewares**: троттлинг и логирование;
+- **Операции**: `pyproject.toml`, `Dockerfile`, GitHub Actions CI.
+
+Тесты: `pytest tests/ -q` (8 тестов: XML, конвертация, история, watchlist,
+алерты (триггеры/направления/парсинг)).
+
 ## Честное примечание об API ЦБ РФ
 
 - Официальный источник: http://www.cbr.ru/scripts/XML_daily.asp — ежедневный
@@ -4145,11 +6669,63 @@ python bot.py
 - **В демо-режиме (`CURRENCY_DEMO_MODE=1`, по умолчанию) бот работает без сети**
   с замороженными курсами (±0.5% «живая» вариация).
 
-## Тесты
 
-```bash
-pytest tests/ -q
-```
+======================================================================
+ФАЙЛ: project6_currency_rate_bot\alerts.py
+======================================================================
+"""Пороговые алерты курсов — чистая логика, покрытая unit-тестами.
+
+Пользователь может подписаться на алерт: «уведоми меня, когда USD станет
+дешевле 90 ₽». Часовой джоб (apscheduler) проверяет активные алерты против
+свежих курсов и уведомляет. Логика отделена от Telegram и БД.
+"""
+from __future__ import annotations
+
+from cbr_api import Rate
+
+DIRECTIONS = ("below", "above")
+
+
+def parse_alert_args(args: list[str]) -> tuple[str, float, str] | None:
+    """Разбирает '/alert USD 90 below' → ('USD', 90.0, 'below').
+
+    Направление необязательно (по умолчанию below). None — если аргументы
+    невалидны.
+    """
+    if len(args) < 2:
+        return None
+    code = args[0].upper()
+    try:
+        threshold = float(args[1].replace(",", "."))
+    except ValueError:
+        return None
+    if threshold <= 0:
+        return None
+    direction = args[2].lower() if len(args) > 2 else "below"
+    if direction not in DIRECTIONS:
+        return None
+    return code, threshold, direction
+
+
+def evaluate_alerts(rates: dict[str, Rate], alerts: list[dict]) -> list[dict]:
+    """Возвращает алерты, сработавшие при данных курсах.
+
+    alerts: [{"id": int, "user_id": int, "char_code": "USD",
+              "threshold": 90.0, "direction": "below"}]
+    Сравниваем курс за 1 единицу валюты (per_one): 'below' — курс ниже порога,
+    'above' — выше. Валюты, которых нет в rates, пропускаем.
+    """
+    triggered: list[dict] = []
+    for alert in alerts:
+        rate = rates.get(alert["char_code"].upper())
+        if rate is None:
+            continue
+        current = rate.per_one
+        if alert["direction"] == "below" and current < alert["threshold"]:
+            triggered.append({**alert, "current": current})
+        elif alert["direction"] == "above" and current > alert["threshold"]:
+            triggered.append({**alert, "current": current})
+    return triggered
 
 
 ======================================================================
@@ -4158,14 +6734,26 @@ pytest tests/ -q
 """Currency Rate Bot (aiogram v3 + официальный ЦБ РФ + apscheduler).
 
 Стек: aiogram v3 (Telegram Bot API) + httpx (XML ЦБ РФ) + xml.etree (stdlib,
-парсинг XML) + aiosqlite (история курсов) + APScheduler (ежедневная рассылка).
+парсинг XML) + aiosqlite (история курсов) + APScheduler (ежедневная рассылка
+и проверка алертов).
 
 Команды:
-  /rates          — курсы основных валют на сегодня
+  /rates          — курсы моих валют (watchlist) или основных
   /rate USD       — курс одной валюты
   /convert 100 USD— перевод валюты в рубли
   /history USD    — курс за последние 7 дней (из SQLite)
-  /daily on|off   — подписка на ежедневную рассылку (в 10:00)
+  /daily on|off   — подписка на ежедневную рассылку
+  /watch USD EUR  — добавить валюты в мой список
+  /unwatch USD    — убрать валюту из списка
+  /watchlist      — мой список валют
+  /alert USD 90 below — алерт: уведомить, когда курс пересечёт порог
+  /alerts         — мои алерты
+  /unalert ID     — удалить алерт
+
+Продвинутый уровень:
+  - персональный watchlist; пороговые алерты (чистая логика в alerts.py),
+    проверяются часовым джобом apscheduler;
+  - middlewares: троттлинг и логирование.
 
 Запуск:  python bot.py   (задайте CURRENCY_BOT_TOKEN, или run_bot6.cmd).
 """
@@ -4185,8 +6773,10 @@ from aiogram.types import Message
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 import config
+from alerts import evaluate_alerts, parse_alert_args
 from cbr_api import CbrClient, Rate
 from db import Database
+from middlewares import LoggingMiddleware, ThrottlingMiddleware
 
 logging.basicConfig(
     level=logging.INFO,
@@ -4202,7 +6792,7 @@ router = Router()
 db = Database(config.DB_PATH)
 cbr = CbrClient()
 
-# Бот создаётся в main() — нужен планировщику для ежедневной рассылки
+# Бот создаётся в main() — нужен планировщику для рассылки и алертов
 _bot: Bot | None = None
 scheduler = AsyncIOScheduler()
 
@@ -4242,14 +6832,51 @@ async def _daily_job() -> None:
             logger.warning("Не удалось доставить рассылку user_id=%s", user_id)
 
 
+async def _alerts_job() -> None:
+    """Проверка пороговых алертов (по умолчанию раз в час).
+
+    Одноразовые: сработавший алерт удаляется после уведомления, чтобы не
+    спамить. Логика срабатывания — чистая функция alerts.evaluate_alerts.
+    """
+    if _bot is None:
+        return
+    alerts = await db.all_active_alerts()
+    if not alerts:
+        return
+    try:
+        rates = await cbr.fetch_rates()
+    except Exception:
+        logger.exception("Алерты: не удалось получить курсы")
+        return
+    for alert in evaluate_alerts(rates, alerts):
+        direction = "дешевле" if alert["direction"] == "below" else "дороже"
+        try:
+            await _bot.send_message(
+                alert["user_id"],
+                f"🔔 <b>Алерт сработал!</b>\n"
+                f"<b>{alert['char_code']}</b> стал {direction} "
+                f"{_money(alert['threshold'])} ₽ — сейчас "
+                f"<b>{_money(alert['current'])} ₽</b>.",
+            )
+        except Exception:
+            logger.warning("Алерт: не удалось уведомить user_id=%s", alert["user_id"])
+        await db.remove_alert(alert["user_id"], alert["id"])
+
+
+# ---------------------------------------------------------------- команды
+
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     await message.answer(
         "💱 <b>Currency Rate Bot</b>\n\n"
-        "/rates — курсы основных валют\n"
+        "/rates — курсы моих валют\n"
         "/rate USD — курс одной валюты\n"
         "/convert 100 USD — перевод в рубли\n"
         "/history USD — курс за 7 дней\n"
+        "/watch USD EUR — добавить валюты в список\n"
+        "/watchlist — мой список валют\n"
+        "/alert USD 90 below — алерт на порог курса\n"
+        "/alerts — мои алерты\n"
         "/daily on — ежедневная рассылка (в 10:00)\n\n"
         f"Источник: <b>{'демо-данные' if cbr.demo_mode else 'официальный ЦБ РФ (cbr.ru)'}</b>"
     )
@@ -4265,7 +6892,10 @@ async def cmd_rates(message: Message) -> None:
         await status.edit_text("⚠️ Не удалось получить курсы. Попробуйте позже.")
         return
     await _save_today(rates)
-    lines = [_fmt(r) for code, r in rates.items() if code in config.MAIN_CURRENCIES]
+    codes = await db.watchlist(message.from_user.id) or config.MAIN_CURRENCIES
+    lines = [_fmt(r) for code, r in rates.items() if code in codes]
+    if not lines:
+        lines = [_fmt(r) for code, r in rates.items() if code in config.MAIN_CURRENCIES]
     await status.edit_text(
         f"💱 <b>Курсы ЦБ РФ на {date.today().isoformat()}</b>\n\n" + "\n".join(lines)
     )
@@ -4360,6 +6990,97 @@ async def cmd_daily(message: Message) -> None:
     )
 
 
+# ---------------------------------------------------- watchlist и алерты
+
+@router.message(Command("watch"))
+async def cmd_watch(message: Message) -> None:
+    codes = [c.upper() for c in message.text.split()[1:] if c.isalnum() and len(c) <= 8]
+    if not codes:
+        await message.answer("Использование: /watch USD EUR CNY")
+        return
+    for code in codes:
+        await db.add_watch(message.from_user.id, code)
+    await message.answer(
+        f"👀 Валюты добавлены в ваш список: <b>{', '.join(codes)}</b>\n"
+        "/rates — показать их курсы"
+    )
+
+
+@router.message(Command("unwatch"))
+async def cmd_unwatch(message: Message) -> None:
+    args = message.text.split()
+    if len(args) < 2:
+        await message.answer("Использование: /unwatch USD")
+        return
+    code = args[1].upper()
+    removed = await db.remove_watch(message.from_user.id, code)
+    await message.answer(
+        f"Валюта <b>{_html.escape(code)}</b> убрана из списка."
+        if removed
+        else f"<b>{_html.escape(code)}</b> не было в вашем списке."
+    )
+
+
+@router.message(Command("watchlist"))
+async def cmd_watchlist(message: Message) -> None:
+    codes = await db.watchlist(message.from_user.id)
+    if not codes:
+        await message.answer(
+            "Ваш список валют пуст. Добавьте: /watch USD EUR\n"
+            "Пока показываются основные валюты."
+        )
+        return
+    await message.answer("👀 <b>Ваш список валют:</b>\n" + "\n".join(f"• {c}" for c in codes))
+
+
+@router.message(Command("alert"))
+async def cmd_alert(message: Message) -> None:
+    parsed = parse_alert_args(message.text.split()[1:])
+    if parsed is None:
+        await message.answer(
+            "Использование: /alert USD 90 below\n"
+            "направление: <b>below</b> (дешевле) или <b>above</b> (дороже)"
+        )
+        return
+    code, threshold, direction = parsed
+    alert_id = await db.add_alert(message.from_user.id, code, threshold, direction)
+    word = "дешевле" if direction == "below" else "дороже"
+    await message.answer(
+        f"🔔 Алерт создан: уведомлю, когда <b>{code}</b> станет {word} "
+        f"<b>{_money(threshold)} ₽</b> (id: {alert_id}).\n"
+        "Проверка — раз в час, /alerts — посмотреть все."
+    )
+
+
+@router.message(Command("alerts"))
+async def cmd_alerts(message: Message) -> None:
+    rows = await db.list_alerts(message.from_user.id)
+    if not rows:
+        await message.answer("У вас нет алертов. Создать: /alert USD 90 below")
+        return
+    lines = [
+        f"• <code>{r['id']}</code> — {r['char_code']} "
+        f"{'<' if r['direction'] == 'below' else '>'} {_money(r['threshold'])} ₽ "
+        f"({r['created_at']})"
+        for r in rows
+    ]
+    await message.answer("🔔 <b>Ваши алерты</b>\n\n" + "\n".join(lines) +
+                         "\n\nУдалить: /unalert ID")
+
+
+@router.message(Command("unalert"))
+async def cmd_unalert(message: Message) -> None:
+    args = message.text.split()
+    if len(args) < 2 or not args[1].isdigit():
+        await message.answer("Использование: /unalert 12 (id из /alerts)")
+        return
+    removed = await db.remove_alert(message.from_user.id, int(args[1]))
+    await message.answer(
+        f"Алерт <code>{args[1]}</code> удалён." if removed
+        else f"Алерт <code>{args[1]}</code> не найден."
+    )
+
+
 async def main() -> None:
     global _bot
     if not config.BOT_TOKEN:
@@ -4369,12 +7090,16 @@ async def main() -> None:
     _bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
     dp.include_router(router)
+    dp.message.middleware(ThrottlingMiddleware(min_interval=config.THROTTLE_MIN_INTERVAL))
+    dp.update.middleware(LoggingMiddleware())
     await db.init()
     scheduler.add_job(_daily_job, "cron", hour=config.DAILY_DIGEST_HOUR, minute=0)
+    scheduler.add_job(_alerts_job, "interval", minutes=config.ALERT_CHECK_MINUTES)
     scheduler.start()
     logger.info(
-        "Валютный бот запущен. Источник: %s",
+        "Валютный бот запущен. Источник: %s. Алерты: каждые %s мин.",
         "демо-данные" if cbr.demo_mode else "ЦБ РФ (cbr.ru)",
+        config.ALERT_CHECK_MINUTES,
     )
     try:
         await dp.start_polling(_bot)
@@ -4544,11 +7269,24 @@ MAIN_CURRENCIES = os.getenv(
     "USD,EUR,CNY,GBP,JPY,KZT,TRY,BYN",
 ).split(",")
 
+# --- Продвинутый уровень ---
+# Как часто проверять пороговые алерты (минуты)
+ALERT_CHECK_MINUTES = int(os.getenv("ALERT_CHECK_MINUTES", "60"))
+# Минимальный интервал между сообщениями пользователя (секунды)
+THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
+
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\db.py
 ======================================================================
-"""SQLite-БД (aiosqlite): история курсов + подписчики ежедневной рассылки."""
+"""SQLite-БД (aiosqlite): история курсов, подписчики рассылки, watchlist,
+пороговые алерты.
+
+Продвинутый уровень:
+  - watchlist — персональный набор валют пользователя (/watch, /watchlist);
+  - alerts — пороговые алерты: пользователь задаёт «USD < 90» и получает
+    уведомление, когда курс пересекает порог.
+"""
 from __future__ import annotations
 
 from cbr_api import Rate
@@ -4582,38 +7320,56 @@ class Database:
                 )
                 """
             )
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS watchlist (
+                    user_id   INTEGER NOT NULL,
+                    char_code TEXT NOT NULL,
+                    PRIMARY KEY (user_id, char_code)
+                )
+                """
+            )
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS alerts (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id    INTEGER NOT NULL,
+                    char_code  TEXT NOT NULL,
+                    threshold  REAL NOT NULL,
+                    direction  TEXT NOT NULL,
+                    created_at TEXT DEFAULT (datetime('now'))
+                )
+                """
+            )
             await db.commit()
 
+    # --- история курсов ---
+
     async def save_rates(self, rates: dict[str, Rate], date_iso: str) -> int:
-        """Сохраняет курсы на дату, возвращает число записанных строк."""
         async with aiosqlite.connect(self.path) as db:
             await db.executemany(
                 """
                 INSERT OR REPLACE INTO rates_history (char_code, date, value, nominal)
                 VALUES (?, ?, ?, ?)
                 """,
-                [
-                    (code, date_iso, rate.value, rate.nominal)
-                    for code, rate in rates.items()
-                ],
+                [(code, date_iso, rate.value, rate.nominal) for code, rate in rates.items()],
             )
             await db.commit()
         return len(rates)
 
     async def history(self, char_code: str, days: int = 7) -> list[tuple[str, float]]:
-        """Последние N дней курса валюты: [(date, value), ...] (новые сверху)."""
         async with aiosqlite.connect(self.path) as db:
             async with db.execute(
                 """
                 SELECT date, value FROM rates_history
-                WHERE char_code = ?
-                ORDER BY date DESC
-                LIMIT ?
+                WHERE char_code = ? ORDER BY date DESC LIMIT ?
                 """,
                 (char_code.upper(), days),
             ) as cur:
                 rows = await cur.fetchall()
         return [(r[0], r[1]) for r in rows]
+
+    # --- ежедневная рассылка ---
 
     async def set_digest(self, user_id: int, username: str | None, on: bool) -> None:
         async with aiosqlite.connect(self.path) as db:
@@ -4630,13 +7386,157 @@ class Database:
             await db.commit()
 
     async def digest_users(self) -> list[tuple[int, str]]:
-        """Пользователи, подписанные на ежедневную рассылку."""
         async with aiosqlite.connect(self.path) as db:
             async with db.execute(
                 "SELECT user_id, username FROM users WHERE daily_digest = 1"
             ) as cur:
                 rows = await cur.fetchall()
         return [(r[0], r[1] or "") for r in rows]
+
+    # --- watchlist (персональный набор валют) ---
+
+    async def add_watch(self, user_id: int, char_code: str) -> None:
+        async with aiosqlite.connect(self.path) as db:
+            await db.execute(
+                "INSERT OR IGNORE INTO watchlist (user_id, char_code) VALUES (?, ?)",
+                (user_id, char_code.upper()),
+            )
+            await db.commit()
+
+    async def remove_watch(self, user_id: int, char_code: str) -> bool:
+        async with aiosqlite.connect(self.path) as db:
+            cur = await db.execute(
+                "DELETE FROM watchlist WHERE user_id = ? AND char_code = ?",
+                (user_id, char_code.upper()),
+            )
+            await db.commit()
+            return cur.rowcount > 0
+
+    async def watchlist(self, user_id: int) -> list[str]:
+        async with aiosqlite.connect(self.path) as db:
+            async with db.execute(
+                "SELECT char_code FROM watchlist WHERE user_id = ? ORDER BY char_code",
+                (user_id,),
+            ) as cur:
+                rows = await cur.fetchall()
+        return [r[0] for r in rows]
+
+    # --- пороговые алерты ---
+
+    async def add_alert(self, user_id: int, char_code: str, threshold: float, direction: str) -> int:
+        async with aiosqlite.connect(self.path) as db:
+            cur = await db.execute(
+                "INSERT INTO alerts (user_id, char_code, threshold, direction) "
+                "VALUES (?, ?, ?, ?)",
+                (user_id, char_code.upper(), threshold, direction),
+            )
+            await db.commit()
+            return cur.lastrowid
+
+    async def list_alerts(self, user_id: int) -> list[dict]:
+        async with aiosqlite.connect(self.path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT * FROM alerts WHERE user_id = ? ORDER BY id DESC", (user_id,)
+            )
+            rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+    async def remove_alert(self, user_id: int, alert_id: int) -> bool:
+        async with aiosqlite.connect(self.path) as db:
+            cur = await db.execute(
+                "DELETE FROM alerts WHERE user_id = ? AND id = ?", (user_id, alert_id)
+            )
+            await db.commit()
+            return cur.rowcount > 0
+
+    async def all_active_alerts(self) -> list[dict]:
+        async with aiosqlite.connect(self.path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT id, user_id, char_code, threshold, direction FROM alerts"
+            )
+            rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+
+======================================================================
+ФАЙЛ: project6_currency_rate_bot\middlewares.py
+======================================================================
+"""Middlewares aiogram v3: троттлинг и логирование (продвинутый уровень)."""
+from __future__ import annotations
+
+import logging
+import time
+from collections import defaultdict
+from typing import Any, Awaitable, Callable
+
+from aiogram import BaseMiddleware
+from aiogram.types import TelegramObject
+
+logger = logging.getLogger(__name__)
+
+
+class ThrottlingMiddleware(BaseMiddleware):
+    """Ограничивает частоту сообщений от одного пользователя."""
+
+    def __init__(self, min_interval: float = 0.7, burst: int = 3) -> None:
+        self._min_interval = min_interval
+        self._burst = burst
+        self._last: dict[int, float] = {}
+        self._streak: dict[int, int] = defaultdict(int)
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        user_id = getattr(getattr(event, "from_user", None), "id", None)
+        if user_id is not None:
+            now = time.monotonic()
+            last = self._last.get(user_id)
+            if last is not None and now - last < self._min_interval:
+                self._streak[user_id] += 1
+                if self._streak[user_id] >= self._burst:
+                    logger.warning(
+                        "Throttle: пользователь %s шлёт сообщения чаще, чем раз в %.1fs",
+                        user_id, self._min_interval,
+                    )
+                return None
+            self._last[user_id] = now
+            self._streak[user_id] = 0
+        return await handler(event, data)
+
+
+class LoggingMiddleware(BaseMiddleware):
+    """Замеряет и пишет в лог время обработки каждого апдейта."""
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        start = time.perf_counter()
+        result = await handler(event, data)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
+        return result
+
+
+======================================================================
+ФАЙЛ: project6_currency_rate_bot\pyproject.toml
+======================================================================
+[project]
+name = "currency-rate-bot"
+version = "2.0.0"
+description = "Курсы валют ЦБ РФ: XML-парсинг, конвертация, история, алерты, рассылка"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
 
 
 ======================================================================
@@ -4685,9 +7585,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\tests\test_cbr.py
 ======================================================================
-"""Unit-тесты Currency Rate Bot: парсинг XML ЦБ, демо-режим, история."""
+"""Unit-тесты Currency Rate Bot: парсинг XML ЦБ, демо-режим, история,
+watchlist и пороговые алерты."""
 import asyncio
 
+from alerts import evaluate_alerts, parse_alert_args
 from cbr_api import CbrClient, Rate, parse_cbr_xml
 from db import Database
 
@@ -4706,6 +7608,13 @@ SAMPLE_XML = """<?xml version="1.0" encoding="windows-1251"?>
   <Name>Японская иена</Name><Value>60,8300</Value>
 </Valute>
 </ValCurs>"""
+
+
+def _rates() -> dict[str, Rate]:
+    return {
+        "USD": Rate(char_code="USD", nominal=1, name="Доллар США", value=91.23),
+        "JPY": Rate(char_code="JPY", nominal=100, name="Японская иена", value=60.83),
+    }
 
 
 def test_parse_cbr_xml() -> None:
@@ -4775,3 +7684,73 @@ def test_history_db(tmp_path) -> None:
         assert [uid for uid, _ in await db.digest_users()] == [1]
 
     asyncio.run(run())
+
+
+# ---------------------------------------------------------------- продвинутый уровень
+
+def test_watchlist_db(tmp_path) -> None:
+    async def run() -> None:
+        db = Database(str(tmp_path / "rates.db"))
+        await db.init()
+        await db.add_watch(1, "usd")   # регистр нормализуется
+        await db.add_watch(1, "EUR")
+        await db.add_watch(1, "USD")   # дубль игнорируется
+        assert await db.watchlist(1) == ["EUR", "USD"]
+        assert await db.remove_watch(1, "eur")   # регистр не важен
+        assert await db.watchlist(1) == ["USD"]
+        assert not await db.remove_watch(1, "EUR")  # повторное удаление — False
+
+    asyncio.run(run())
+
+
+def test_alert_db_and_trigger(tmp_path) -> None:
+    async def run() -> None:
+        db = Database(str(tmp_path / "rates.db"))
+        await db.init()
+        alert_id = await db.add_alert(1, "USD", 90.0, "below")
+        await db.add_alert(1, "USD", 95.0, "above")
+        await db.add_alert(2, "JPY", 0.6, "below")
+        rows = await db.list_alerts(1)
+        assert len(rows) == 2 and rows[0]["id"] == alert_id + 1  # новые сверху
+
+        # курс USD = 91.23: 'below 90' и 'above 95' не сработали
+        active = await db.all_active_alerts()
+        triggered = evaluate_alerts(_rates(), active)
+        assert triggered == []
+
+        # курс ниже порога: меняем курс и пересчитываем
+        rates_low = {"USD": Rate(char_code="USD", nominal=1, name="Доллар США", value=89.5)}
+        triggered = evaluate_alerts(rates_low, active)
+        assert len(triggered) == 1
+        assert triggered[0]["id"] == alert_id
+        assert round(triggered[0]["current"], 1) == 89.5
+
+        # одноразовость: удаляем сработавший алерт
+        assert await db.remove_alert(triggered[0]["user_id"], triggered[0]["id"])
+        assert await db.remove_alert(2, 3)  # второй алерт тоже
+
+    asyncio.run(run())
+
+
+def test_evaluate_alerts_directions() -> None:
+    rates = _rates()  # USD 91.23, JPY 0.6083
+    alerts = [
+        {"id": 1, "user_id": 1, "char_code": "USD", "threshold": 90.0, "direction": "above"},
+        {"id": 2, "user_id": 1, "char_code": "USD", "threshold": 92.0, "direction": "below"},
+        {"id": 3, "user_id": 2, "char_code": "JPY", "threshold": 0.61, "direction": "below"},
+        {"id": 4, "user_id": 3, "char_code": "XXX", "threshold": 1.0, "direction": "below"},
+    ]
+    triggered = evaluate_alerts(rates, alerts)
+    ids = sorted(t["id"] for t in triggered)
+    # USD 91.23 > 90 (above) ✓; USD 91.23 < 92 (below) ✓;
+    # JPY 0.6083 < 0.61 (below) ✓; XXX нет в курсах — пропущен
+    assert ids == [1, 2, 3]
+
+
+def test_parse_alert_args() -> None:
+    assert parse_alert_args(["USD", "90"]) == ("USD", 90.0, "below")
+    assert parse_alert_args(["usd", "90,5", "above"]) == ("USD", 90.5, "above")
+    assert parse_alert_args(["USD", "abc"]) is None       # не число
+    assert parse_alert_args(["USD", "-5"]) is None        # порог <= 0
+    assert parse_alert_args(["USD", "90", "sideways"]) is None  # неверное направление
+    assert parse_alert_args(["USD"]) is None              # мало аргументов

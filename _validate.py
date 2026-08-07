@@ -134,9 +134,9 @@ def validate_p5() -> None:
         if os.path.exists(db.path):
             os.remove(db.path)
         await db.init()
-        await db.save_result(1, "alice", 8)
-        await db.save_result(2, "bob", 5)
-        await db.save_result(1, "alice", 10)
+        await db.save_result(1, "alice", 8, 10)
+        await db.save_result(2, "bob", 5, 10)
+        await db.save_result(1, "alice", 10, 10)
         assert (await db.leaderboard())[0] == ("alice", 10)
         assert await db.stats(1) == (2, 10)
 
