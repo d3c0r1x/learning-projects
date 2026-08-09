@@ -60,7 +60,7 @@ Desktop.ini
 | 8 | [telegram-expense-tracker](https://github.com/d3c0r1x/telegram-expense-tracker) | Учёт расходов: `/add`, автокатегоризация, отчёты, CSV для Excel | aiogram v3, aiosqlite, stdlib csv |
 | 9 | [telegram-news-bot](https://github.com/d3c0r1x/telegram-news-bot) | RSS/Atom ленты, дедупликация, ежедневный дайджест | aiogram v3, httpx, aiosqlite, xml.etree, apscheduler |
 | 10 | [ozon-price-tracker](https://github.com/d3c0r1x/ozon-price-tracker) | Мониторинг цен и остатков на Ozon: падение цены, возврат в наличие, пороги | aiogram v3, httpx, curl_cffi, aiosqlite, apscheduler |
-| 11 | [marketplace-price-compare](https://github.com/d3c0r1x/marketplace-price-compare) | Сравнение цен WB и Ozon: поиск, лучшая цена, watch-подписки на падение цены | aiogram v3, httpx, curl_cffi, aiosqlite, apscheduler, pydantic |
+| 11 | [marketplace-price-compare](https://github.com/d3c0r1x/marketplace-price-compare) | Сравнение цен WB, Ozon и Яндекс Маркет: поиск, лучшая цена, watch-подписки на падение цены | aiogram v3, httpx, curl_cffi, aiosqlite, apscheduler, pydantic |
 
 ## Содержимое репозитория
 
@@ -77,7 +77,7 @@ Desktop.ini
 - **тесты и CI** — `pytest` + `compileall` при каждом push в каждом репозитории;
 - **Dockerfile и pyproject.toml** — возможность запуска в любом окружении.
 
-Итого **108 unit-тестов** (9+7+7+5+10+8+7+8+6+19+22) + изолированный валидатор. В Проектах 5, 10 и 11 — интеграционные тесты полных игровых/рабочих сценариев через настоящий Dispatcher с перехватом исходящих вызовов Bot API. В каждом README — раздел «Технические особенности» с описанием выявленных ограничений и решений, а также «Планы развития».
+Итого **118 unit-тестов** (9+8+7+5+12+9+8+8+6+19+27) + изолированный валидатор. В Проектах 5, 10 и 11 — интеграционные тесты полных игровых/рабочих сценариев через настоящий Dispatcher с перехватом исходящих вызовов Bot API. В каждом README — раздел «Технические особенности» с описанием выявленных ограничений и решений, а также «Планы развития».
 
 ## Примечания о публичных API (проверено 2026-08-05/08)
 
@@ -104,7 +104,7 @@ python bot.py
 ## Связи между проектами
 
 - **1 → 2**: оба обращаются к публичным API WB (карточки и отзывы);
-- **1, 10, 11**: трекер WB, трекер Ozon и компаратор WB↔Ozon образуют линейку инструментов для работы с маркетплейсами (адаптеры WB в 1 и 11 построены на одном эндпоинте `search.wb.ru`);
+- **1, 10, 11**: трекер WB, трекер Ozon и компаратор WB↔Ozon↔Яндекс образуют линейку инструментов для работы с маркетплейсами (адаптеры WB в 1 и 11 построены на одном эндпоинте `search.wb.ru`);
 - **4 → 2**: Проект 4 открывает доступ к AI-анализу Проекта 2 после оплаты (`ai_service.py` импортирует его модули, если папка расположена рядом);
 - **5–9**: независимые боты на бесплатных публичных API без ключей.
 
@@ -112,7 +112,7 @@ python bot.py
 
 - бот для напоминаний/трекеров привычек;
 - «техподдержка» на основе FAQ-базы в SQLite;
-- Yandex Market как третий маркетплейс в компараторе (публичное API с бесплатным ключом).
+- сравнение по конкретному артикулу (не только по текстовому запросу).
 
 ======================================================================
 ФАЙЛ: _validate.py
@@ -604,6 +604,11 @@ CMD ["python", "bot.py"]
 # Ozon Price & Stock Tracker
 
 Telegram-бот для отслеживания цен и остатков товаров на Ozon. Пользователь отправляет ссылку на товар или его ID, бот сохраняет карточку, периодически проверяет цену и остаток и уведомляет об изменениях: цена упала или выросла, достигнут персональный порог, товар снова в наличии или заканчивается.
+
+## 🕹 Живое демо
+
+Попробовать вживую: **[@dfs12f_bot](https://t.me/dfs12f_bot)** — демо-бот портфолио на общем токене.
+Локальный запуск — `run_bot10.cmd` (см. раздел «Запуск»). Примечание: в портфолио один токен на все боты, поэтому одновременно в сети может находиться только один проект.
 
 ## Возможности
 
@@ -1926,101 +1931,6 @@ set "PYTHONIOENCODING=utf-8"
 ..\.venv\Scripts\python.exe -u bot.py
 
 ======================================================================
-ФАЙЛ: project10_ozon_price_tracker\utils.py
-======================================================================
-"""Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером.
-
-Никаких внешних зависимостей — кэш и повторы реализованы на asyncio/time/random.
-"""
-from __future__ import annotations
-
-import asyncio
-import functools
-import logging
-import random
-import time
-from typing import Any, Awaitable, Callable, TypeVar
-
-logger = logging.getLogger(__name__)
-
-T = TypeVar("T")
-
-
-class TTLCache:
-    """Простейший TTL-кэш: значение живёт ttl секунд после записи."""
-
-    def __init__(self, ttl_seconds: float = 300.0) -> None:
-        self._ttl = ttl_seconds
-        self._store: dict[Any, tuple[float, Any]] = {}
-
-    def get(self, key: Any) -> Any | None:
-        item = self._store.get(key)
-        if item is None:
-            return None
-        expires, value = item
-        if time.monotonic() > expires:
-            self._store.pop(key, None)
-            return None
-        return value
-
-    async def get_or_set(self, key: Any, factory: Callable[[], Awaitable[T]]) -> T:
-        cached = self.get(key)
-        if cached is not None:
-            return cached
-        value = await factory()
-        self._store[key] = (time.monotonic() + self._ttl, value)
-        return value
-
-    def invalidate(self, key: Any | None = None) -> None:
-        """Сброс одного ключа или всего кэша (key=None)."""
-        if key is None:
-            self._store.clear()
-        else:
-            self._store.pop(key, None)
-
-    @property
-    def size(self) -> int:
-        return len(self._store)
-
-
-def backoff(attempt: int, base: float = 0.5, max_delay: float = 10.0, jitter: float = 0.3) -> float:
-    """Экспоненциальный backoff с джиттером: base * 2^(attempt-1), ±jitter%."""
-    delay = min(base * (2 ** (attempt - 1)), max_delay)
-    return delay * (1 + random.uniform(-jitter, jitter))
-
-
-def async_retry(
-    retries: int = 3,
-    base: float = 0.5,
-    retry_on: tuple[type[Exception], ...] = (Exception,),
-):
-    """Декоратор для асинхронных функций: повторы с экспоненциальным backoff."""
-
-    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> T:
-            last: Exception | None = None
-            for attempt in range(1, retries + 1):
-                try:
-                    return await func(*args, **kwargs)
-                except retry_on as exc:
-                    last = exc
-                    if attempt == retries:
-                        break
-                    delay = backoff(attempt, base=base)
-                    logger.debug(
-                        "%s: попытка %d/%d не удалась (%s), повтор через %.1fs",
-                        func.__name__, attempt, retries, exc, delay,
-                    )
-                    await asyncio.sleep(delay)
-            assert last is not None
-            raise last
-
-        return wrapper
-
-    return decorator
-
-======================================================================
 ФАЙЛ: project10_ozon_price_tracker\tests\conftest.py
 ======================================================================
 """Делает модули проекта импортируемыми для pytest."""
@@ -2623,6 +2533,101 @@ def test_mock_client_fields() -> None:
     assert "mock" in product["title"].lower()
 
 ======================================================================
+ФАЙЛ: project10_ozon_price_tracker\utils.py
+======================================================================
+"""Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером.
+
+Никаких внешних зависимостей — кэш и повторы реализованы на asyncio/time/random.
+"""
+from __future__ import annotations
+
+import asyncio
+import functools
+import logging
+import random
+import time
+from typing import Any, Awaitable, Callable, TypeVar
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+class TTLCache:
+    """Простейший TTL-кэш: значение живёт ttl секунд после записи."""
+
+    def __init__(self, ttl_seconds: float = 300.0) -> None:
+        self._ttl = ttl_seconds
+        self._store: dict[Any, tuple[float, Any]] = {}
+
+    def get(self, key: Any) -> Any | None:
+        item = self._store.get(key)
+        if item is None:
+            return None
+        expires, value = item
+        if time.monotonic() > expires:
+            self._store.pop(key, None)
+            return None
+        return value
+
+    async def get_or_set(self, key: Any, factory: Callable[[], Awaitable[T]]) -> T:
+        cached = self.get(key)
+        if cached is not None:
+            return cached
+        value = await factory()
+        self._store[key] = (time.monotonic() + self._ttl, value)
+        return value
+
+    def invalidate(self, key: Any | None = None) -> None:
+        """Сброс одного ключа или всего кэша (key=None)."""
+        if key is None:
+            self._store.clear()
+        else:
+            self._store.pop(key, None)
+
+    @property
+    def size(self) -> int:
+        return len(self._store)
+
+
+def backoff(attempt: int, base: float = 0.5, max_delay: float = 10.0, jitter: float = 0.3) -> float:
+    """Экспоненциальный backoff с джиттером: base * 2^(attempt-1), ±jitter%."""
+    delay = min(base * (2 ** (attempt - 1)), max_delay)
+    return delay * (1 + random.uniform(-jitter, jitter))
+
+
+def async_retry(
+    retries: int = 3,
+    base: float = 0.5,
+    retry_on: tuple[type[Exception], ...] = (Exception,),
+):
+    """Декоратор для асинхронных функций: повторы с экспоненциальным backoff."""
+
+    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+        @functools.wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> T:
+            last: Exception | None = None
+            for attempt in range(1, retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except retry_on as exc:
+                    last = exc
+                    if attempt == retries:
+                        break
+                    delay = backoff(attempt, base=base)
+                    logger.debug(
+                        "%s: попытка %d/%d не удалась (%s), повтор через %.1fs",
+                        func.__name__, attempt, retries, exc, delay,
+                    )
+                    await asyncio.sleep(delay)
+            assert last is not None
+            raise last
+
+        return wrapper
+
+    return decorator
+
+======================================================================
 ФАЙЛ: project11_marketplace_compare\.dockerignore
 ======================================================================
 .env
@@ -2704,6 +2709,11 @@ CMD ["python", "bot.py"]
 # Marketplace Price Comparison
 
 Telegram-бот для сравнения цен на одни и те же товары на **Wildberries**, **Ozon** и **Яндекс Маркете**. Поисковый запрос отправляется во все маркетплейсы параллельно, выдача объединяется, сортируется по цене, и самый дешёвый вариант помечается. Дополнительно можно подписаться на запрос (`/watch`): бот периодически ищет заново и уведомляет, когда лучшая цена упала или достигла порога.
+
+## 🕹 Живое демо
+
+Попробовать вживую: **[@dfs12f_bot](https://t.me/dfs12f_bot)** — демо-бот портфолио на общем токене.
+Локальный запуск — `run_bot11.cmd` (см. раздел «Запуск»). Примечание: в портфолио один токен на все боты, поэтому одновременно в сети может находиться только один проект.
 
 ## Возможности
 
@@ -2797,6 +2807,562 @@ python bot.py
 - сравнение по конкретному артикулу (а не только по текстовому запросу);
 - график динамики лучшей цены по подписке;
 - учёт стоимости доставки в итоговом сравнении.
+
+======================================================================
+ФАЙЛ: project11_marketplace_compare\adapters\__init__.py
+======================================================================
+"""Адаптеры маркетплейсов: единый интерфейс search(query) -> list[Product]."""
+from adapters.ozon import MockOzonAdapter, OzonAdapter
+from adapters.wb import MockWbAdapter, WbAdapter
+from adapters.yandex import MockYandexAdapter, YandexAdapter
+
+__all__ = [
+    "OzonAdapter", "MockOzonAdapter",
+    "WbAdapter", "MockWbAdapter",
+    "YandexAdapter", "MockYandexAdapter",
+]
+
+======================================================================
+ФАЙЛ: project11_marketplace_compare\adapters\base.py
+======================================================================
+"""Общая HTTP-обвязка адаптеров: транспорты httpx/curl_cffi, retry, заголовки.
+
+Транспорты и логика повторов общие для всех маркетплейсов — по одному клиенту на
+маркетплейс, чтобы не дублировать код. Антибот-ситуация описана в README:
+оба публичных API защищены, поэтому предусмотрен прокси и демо-режим.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+
+import config
+
+logger = logging.getLogger(__name__)
+
+# Заголовки «как у браузера». User-Agent при curl_cffi выставляет имитация
+# Chrome (ручной UA сломал бы отпечаток).
+BROWSER_HEADERS = {
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-site",
+}
+
+_RETRY_STATUSES = {429, *range(500, 600)}
+
+
+def _backoff(attempt: int, min_delay: float = 0.5) -> float:
+    """Экспоненциальная задержка: 0.5, 1.0, 2.0 … (потолок 10 c)."""
+    return min(min_delay * (2 ** (attempt - 1)), 10.0)
+
+
+try:
+    from curl_cffi.requests import AsyncSession as CurlCffiSession
+
+    HAS_CURL_CFFI = True
+except ImportError:  # pragma: no cover
+    CurlCffiSession = None
+    HAS_CURL_CFFI = False
+
+
+class HttpxTransport:
+    """Транспорт на httpx (без имитации отпечатка)."""
+
+    def __init__(self, timeout: float = 20.0, proxy: str = "") -> None:
+        import httpx
+
+        self._client = httpx.AsyncClient(timeout=timeout, proxy=proxy or None)
+
+    async def get(self, url: str, *, params=None, headers=None) -> tuple[int, str]:
+        resp = await self._client.get(url, params=params, headers=headers)
+        return resp.status_code, resp.text
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+
+class CurlCffiTransport:
+    """Транспорт на curl_cffi: имитация TLS/HTTP2-отпечатка Chrome."""
+
+    def __init__(
+        self,
+        timeout: float = 20.0,
+        impersonate: str = "chrome",
+        proxies: dict | None = None,
+    ) -> None:
+        self._session = CurlCffiSession(
+            impersonate=impersonate,
+            timeout=timeout,
+            proxies=proxies,
+        )
+
+    async def get(self, url: str, *, params=None, headers=None) -> tuple[int, str]:
+        resp = await self._session.get(
+            url, params=params, headers=headers, allow_redirects=False
+        )
+        return resp.status_code, resp.text
+
+    async def aclose(self) -> None:
+        closer = getattr(self._session, "aclose", None) or self._session.close
+        await closer()
+
+
+def _make_transport() -> HttpxTransport | CurlCffiTransport:
+    """Выбирает транспорт по MARKET_HTTP_CLIENT (curl_cffi по умолчанию)."""
+    if config.HTTP_CLIENT == "curl_cffi":
+        if not HAS_CURL_CFFI:
+            logger.warning(
+                "MARKET_HTTP_CLIENT=curl_cffi, но библиотека не установлена. "
+                "Падаем обратно на httpx. Установите: pip install curl_cffi"
+            )
+        else:
+            proxies = None
+            if config.PROXY:
+                proxies = {"http": config.PROXY, "https": config.PROXY}
+            return CurlCffiTransport(proxies=proxies)
+    return HttpxTransport(proxy=config.PROXY)
+
+
+class BaseAdapter:
+    """Базовый HTTP-адаптер: GET с retry на 429/5xx и сетевые ошибки."""
+
+    name = "base"
+    # Заголовки по умолчанию; адаптеры переопределяют (см. wb.py/ozon.py),
+    # добавляя специфичные для маркетплейса (Referer, Origin, x-o3-app-name).
+    headers = BROWSER_HEADERS
+
+    def __init__(self, transport=None, max_retries: int | None = None) -> None:
+        self._transport = transport if transport is not None else _make_transport()
+        self._max_retries = max_retries if max_retries is not None else config.MAX_RETRIES
+
+    async def _get(self, url: str, *, params=None, retries: int | None = None,
+               extra_headers: dict | None = None) -> tuple[int, str]:
+        max_retries = self._max_retries if retries is None else retries
+        last_exc: Exception | None = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                status, text = await self._transport.get(
+                    url, params=params, headers={**self.headers, **(extra_headers or {})}
+                )
+            except Exception as exc:
+                last_exc = exc
+                if attempt == max_retries:
+                    raise
+                await asyncio.sleep(_backoff(attempt))
+                continue
+            if status in _RETRY_STATUSES and attempt < max_retries:
+                await asyncio.sleep(_backoff(attempt))
+                continue
+            return status, text
+        raise last_exc if last_exc is not None else RuntimeError("unreachable")
+
+    async def search(self, query: str, limit: int = 5) -> list:
+        """Поиск товаров по запросу. Возвращает список Product."""
+        raise NotImplementedError
+
+    async def aclose(self) -> None:
+        await self._transport.aclose()
+
+======================================================================
+ФАЙЛ: project11_marketplace_compare\adapters\ozon.py
+======================================================================
+"""Адаптер Ozon: поиск товаров по названию.
+
+Использует публичный composer-api (www.ozon.ru/api/composer-api.bx/page/json/v2,
+url=/search/?text=...). Ответ — словарь widgetStates, где каждый виджет это
+JSON-строка; товары живут в виджетах с префиксом "webSearchResults".
+Структура Ozon нестабильна, поэтому парсер ищет объекты product рекурсивно.
+
+Честный статус: с IP без валидного region-cookie composer-api отдаёт
+HTTP 307 (редирект-петля антибота) — адаптер возвращает пустую выдачу;
+решение — прокси (MARKET_PROXY) или демо-режим.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import zlib
+
+from adapters.base import BROWSER_HEADERS, BaseAdapter
+from models import Product
+
+logger = logging.getLogger(__name__)
+
+COMPOSER_API_URL = "https://www.ozon.ru/api/composer-api.bx/page/json/v2"
+
+def _iter_widget_states(data: dict):
+    """Итерирует (ключ_виджета, распарсенный_json) из widgetStates."""
+    for key, raw in (data.get("widgetStates") or {}).items():
+        if not isinstance(raw, str):
+            continue
+        try:
+            yield key, json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+
+def _find_products(node, acc: list[dict], depth: int = 0) -> None:
+    """Рекурсивно собирает объекты, похожие на товар Ozon (есть id и title)."""
+    if depth > 8:
+        return
+    if isinstance(node, dict):
+        if "product" in node and isinstance(node["product"], dict):
+            acc.append(node["product"])
+        for value in node.values():
+            _find_products(value, acc, depth + 1)
+    elif isinstance(node, list):
+        for item in node:
+            _find_products(item, acc, depth + 1)
+
+
+def _to_rubles(value) -> int | None:
+    """Нормализует цену Ozon в целые рубли (строки рублей или копейки)."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, dict):
+        value = value.get("value") or value.get("price")
+    if isinstance(value, (int, float)):
+        if isinstance(value, float):
+            return int(round(value))
+        return value if value < 100000 else value // 100
+    s = str(value).replace("\u00a0", " ").replace(" ", "").replace(",", ".").strip()
+    if not s or not s.replace(".", "").isdigit():
+        return None
+    num = float(s)
+    if num < 100000 and "." in s and len(s.split(".")[-1]) <= 2:
+        return int(round(num))
+    if num >= 100000:
+        return int(num // 100)
+    return int(round(num))
+
+
+class OzonAdapter(BaseAdapter):
+    """Поиск по Ozon через публичный composer-api."""
+
+    name = "ozon"
+    # Ozon ожидает заголовок x-o3-app-name (как у приложения/веба)
+    headers = {
+        **BROWSER_HEADERS,
+        "Referer": "https://www.ozon.ru/",
+        "Origin": "https://www.ozon.ru",
+        "x-o3-app-name": "rich",
+    }
+
+    async def search(self, query: str, limit: int = 5) -> list[Product]:
+        params = {"url": f"/search/?text={query}"}
+        status, text = await self._get(COMPOSER_API_URL, params=params)
+        if status == 307:
+            logger.warning(
+                "Ozon composer-api -> HTTP 307 для запроса %r: регион-блок", query
+            )
+            return []
+        if status != 200:
+            logger.warning("Ozon composer-api -> HTTP %s для запроса %r", status, query)
+            return []
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            logger.warning("Ozon composer-api вернул не-JSON для запроса %r", query)
+            return []
+        return self._parse_response(data, limit)
+
+    def _parse_response(self, data: dict, limit: int) -> list[Product]:
+        """Собирает товары из search-виджетов composer-ответа."""
+        products: list[Product] = []
+        seen: set[str] = set()
+        for key, widget in _iter_widget_states(data):
+            if not key.startswith("webSearchResults"):
+                continue
+            raw_products: list[dict] = []
+            _find_products(widget, raw_products)
+            for raw in raw_products:
+                product = self.parse_product(raw)
+                if product is None or product.ext_id in seen:
+                    continue
+                seen.add(product.ext_id)
+                products.append(product)
+                if len(products) >= limit:
+                    return products
+        return products
+
+    @staticmethod
+    def parse_product(raw: dict) -> Product | None:
+        """Сырой товар Ozon -> Product."""
+        pid = raw.get("id") or raw.get("ext_id")
+        if pid is None:
+            return None
+        title = raw.get("title") or raw.get("name") or "—"
+        price_block = raw.get("price") or {}
+        price = _to_rubles(price_block.get("price") or price_block.get("value"))
+        old_price = _to_rubles(
+            price_block.get("oldPrice")
+            or price_block.get("old_price")
+            or raw.get("old_price")
+            or raw.get("oldPrice")
+        )
+        stock = _to_rubles(raw.get("stockCount"))
+        if stock is None:
+            stocks = raw.get("stocks")
+            stock = _to_rubles(stocks.get("total")) if isinstance(stocks, dict) else None
+        return Product(
+            marketplace="ozon",
+            ext_id=str(pid),
+            title=str(title),
+            price=price if price is not None else 0,
+            old_price=old_price,
+            url=f"https://www.ozon.ru/product/{pid}/",
+            stock=stock,
+            rating=None,
+        )
+
+
+class MockOzonAdapter:
+    """Демо-режим: детерминированная выдуманная выдача по запросу."""
+
+    name = "ozon"
+
+    async def search(self, query: str, limit: int = 5) -> list[Product]:
+        # zlib.crc32 вместо hash(): хэш строк рандомизируется между процессами
+        seed = zlib.crc32(query.lower().encode("utf-8")) % 100
+        base = 4700 + (seed * 29) % 3000
+        return [
+            Product(
+                marketplace="ozon",
+                ext_id=f"oz-{seed}-{i}",
+                title=f"{query.title()} — вариант {i + 1} (Ozon, mock)",
+                price=base + i * 200,
+                old_price=base + i * 200 + 1200,
+                url=f"https://www.ozon.ru/product/{seed}{i}/",
+                stock=(seed + i * 5) % 25,
+                rating=round(3.8 + (seed % 12) / 10, 1),
+            )
+            for i in range(limit)
+        ]
+
+    async def aclose(self) -> None:
+        return None
+
+======================================================================
+ФАЙЛ: project11_marketplace_compare\adapters\wb.py
+======================================================================
+"""Адаптер Wildberries: поиск товаров по названию.
+
+Использует публичный эндпоинт search.wb.ru (как в Проекте 1). Цены WB
+приходят в КОПЕЙКАХ (priceU / salePriceU) — делим на 100. С заблокированного
+IP эдж отдаёт HTTP 429/403 или «фейковую» пустоту с кодом 200 — в этих
+случаях адаптер возвращает пустую выдачу, а не падает.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import zlib
+
+from adapters.base import BROWSER_HEADERS, BaseAdapter
+from models import Product
+
+logger = logging.getLogger(__name__)
+
+SEARCH_API_URL = "https://search.wb.ru/exactmatch/ru/common/v4/search"
+
+DEFAULT_PARAMS = {
+    "appType": "1",
+    "curr": "rub",
+    "dest": "-1257786",
+    "spp": "30",
+}
+
+class WbAdapter(BaseAdapter):
+    """Поиск по Wildberries через публичный API поиска."""
+
+    name = "wb"
+    # Заголовки WB: сайт wildberries.ru (Origin same-site для search.wb.ru)
+    headers = {
+        **BROWSER_HEADERS,
+        "Referer": "https://www.wildberries.ru/",
+        "Origin": "https://www.wildberries.ru",
+    }
+
+    async def search(self, query: str, limit: int = 5) -> list[Product]:
+        params = {
+            **DEFAULT_PARAMS,
+            "query": query,
+            "resultset": "catalog",
+            "sort": "popular",
+            "page": "1",
+        }
+        status, text = await self._get(SEARCH_API_URL, params=params)
+        if status != 200:
+            logger.warning("search.wb.ru -> HTTP %s для запроса %r", status, query)
+            return []
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            logger.warning("search.wb.ru вернул не-JSON для запроса %r", query)
+            return []
+        products = (data.get("data") or {}).get("products") or []
+        return [p for p in (self._parse(p) for p in products[:limit]) if p is not None]
+
+    @staticmethod
+    def parse_product(raw: dict) -> Product | None:
+        """Сырой товар WB -> Product (цены из копеек в рубли)."""
+        pid = raw.get("id")
+        if pid is None:
+            return None
+        price_u = int(raw.get("priceU", 0) or 0)
+        sale_price_u = int(raw.get("salePriceU", price_u) or price_u)
+        return Product(
+            marketplace="wb",
+            ext_id=str(pid),
+            title=str(raw.get("name") or "—"),
+            price=sale_price_u // 100,
+            old_price=(price_u // 100) if price_u else None,
+            url=f"https://www.wildberries.ru/catalog/{pid}/detail.aspx",
+            stock=int(raw.get("qty", 0) or 0) or None,
+            rating=raw.get("rating"),
+        )
+
+    _parse = parse_product
+
+
+class MockWbAdapter:
+    """Демо-режим: детерминированная выдуманная выдача по запросу."""
+
+    name = "wb"
+
+    async def search(self, query: str, limit: int = 5) -> list[Product]:
+        # zlib.crc32 вместо hash(): хэш строк рандомизируется между процессами
+        seed = zlib.crc32(query.lower().encode("utf-8")) % 100
+        base = 5000 + seed * 37
+        return [
+            Product(
+                marketplace="wb",
+                ext_id=f"wb-{seed}-{i}",
+                title=f"{query.title()} — вариант {i + 1} (WB, mock)",
+                price=base + i * 250,
+                old_price=base + i * 250 + 1500,
+                url=f"https://www.wildberries.ru/catalog/{seed}{i}/detail.aspx",
+                stock=(seed + i * 3) % 40,
+                rating=round(4.0 + (seed % 10) / 10, 1),
+            )
+            for i in range(limit)
+        ]
+
+    async def aclose(self) -> None:
+        return None
+
+======================================================================
+ФАЙЛ: project11_marketplace_compare\adapters\yandex.py
+======================================================================
+"""Адаптер Yandex Market: поиск товаров по названию.
+
+Использует официальное публичное API Yandex Market
+(https://api.content.market.yandex.ru/v2/models) — бесплатное, но требует
+API-ключ (выдаётся в кабинете разработчика Yandex). Ключ передаётся в
+заголовке Authorization без префикса Bearer.
+
+Без ключа API отвечает HTTP 401 — адаптер возвращает пустую выдачу и
+логирует предупреждение (бот продолжает работать с остальными площадками).
+Цены в ответе — числа в рублях с дробной частью ("value": 5499.0) —
+округляются до целых рублей.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import zlib
+
+from adapters.base import BaseAdapter
+from models import Product
+
+logger = logging.getLogger(__name__)
+
+SEARCH_API_URL = "https://api.content.market.yandex.ru/v2/models"
+
+
+class YandexAdapter(BaseAdapter):
+    """Поиск по Yandex Market через официальное публичное API (по ключу)."""
+
+    name = "yandex"
+
+    def __init__(self, api_key: str = "", region_id: int = 213, transport=None,
+                 max_retries: int | None = None) -> None:
+        super().__init__(transport=transport, max_retries=max_retries)
+        self._api_key = api_key
+        self._region_id = region_id
+
+    async def search(self, query: str, limit: int = 5) -> list[Product]:
+        if not self._api_key:
+            logger.warning(
+                "MARKET_YANDEX_API_KEY не задан — Yandex Market пропущен. "
+                "Ключ выдаётся бесплатно в кабинете разработчика Yandex."
+            )
+            return []
+        params = {"query": query, "regionId": self._region_id}
+        extra_headers = {"Authorization": self._api_key}
+        status, text = await self._get(SEARCH_API_URL, params=params, extra_headers=extra_headers)
+        if status == 401:
+            logger.warning("Yandex Market -> HTTP 401: ключ недействителен")
+            return []
+        if status != 200:
+            logger.warning("Yandex Market -> HTTP %s для запроса %r", status, query)
+            return []
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            logger.warning("Yandex Market вернул не-JSON для запроса %r", query)
+            return []
+        items = data.get("items") or []
+        return [p for p in (self.parse_product(i) for i in items[:limit]) if p is not None]
+
+    @staticmethod
+    def parse_product(raw: dict) -> Product | None:
+        """Сырой товар Yandex Market -> Product (цены округляются до рублей)."""
+        pid = raw.get("id")
+        if pid is None:
+            return None
+        prices = raw.get("prices") or {}
+        price = prices.get("value")
+        old_price = prices.get("oldValue") or (prices.get("discount") or {}).get("oldValue")
+        link = raw.get("link") or f"https://market.yandex.ru/product/{pid}/"
+        return Product(
+            marketplace="yandex",
+            ext_id=str(pid),
+            title=str(raw.get("name") or "—"),
+            price=int(round(price)) if isinstance(price, (int, float)) else 0,
+            old_price=int(round(old_price)) if isinstance(old_price, (int, float)) else None,
+            url=str(link),
+            stock=None,  # публичное API не отдаёт остатки
+            rating=raw.get("rating"),
+        )
+
+
+class MockYandexAdapter:
+    """Демо-режим: детерминированная выдуманная выдача по запросу."""
+
+    name = "yandex"
+
+    async def search(self, query: str, limit: int = 5) -> list[Product]:
+        seed = zlib.crc32(query.lower().encode("utf-8")) % 100
+        base = 5200 + (seed * 17) % 2500
+        return [
+            Product(
+                marketplace="yandex",
+                ext_id=f"ya-{seed}-{i}",
+                title=f"{query.title()} — вариант {i + 1} (Яндекс Маркет, mock)",
+                price=base + i * 180,
+                old_price=base + i * 180 + 1000,
+                url=f"https://market.yandex.ru/product/{seed}{i}/",
+                stock=None,
+                rating=round(4.2 + (seed % 8) / 10, 1),
+            )
+            for i in range(limit)
+        ]
+
+    async def aclose(self) -> None:
+        return None
 
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\alerts.py
@@ -3636,653 +4202,6 @@ set "PYTHONIOENCODING=utf-8"
 ..\.venv\Scripts\python.exe -u bot.py
 
 ======================================================================
-ФАЙЛ: project11_marketplace_compare\utils.py
-======================================================================
-"""Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером."""
-from __future__ import annotations
-
-import asyncio
-import functools
-import logging
-import random
-import time
-from typing import Any, Awaitable, Callable, TypeVar
-
-logger = logging.getLogger(__name__)
-
-T = TypeVar("T")
-
-
-class TTLCache:
-    """Простейший TTL-кэш: значение живёт ttl секунд после записи."""
-
-    def __init__(self, ttl_seconds: float = 300.0) -> None:
-        self._ttl = ttl_seconds
-        self._store: dict[Any, tuple[float, Any]] = {}
-
-    def get(self, key: Any) -> Any | None:
-        item = self._store.get(key)
-        if item is None:
-            return None
-        expires, value = item
-        if time.monotonic() > expires:
-            self._store.pop(key, None)
-            return None
-        return value
-
-    async def get_or_set(self, key: Any, factory: Callable[[], Awaitable[T]]) -> T:
-        cached = self.get(key)
-        if cached is not None:
-            return cached
-        value = await factory()
-        self._store[key] = (time.monotonic() + self._ttl, value)
-        return value
-
-    def invalidate(self, key: Any | None = None) -> None:
-        if key is None:
-            self._store.clear()
-        else:
-            self._store.pop(key, None)
-
-    @property
-    def size(self) -> int:
-        return len(self._store)
-
-
-def backoff(attempt: int, base: float = 0.5, max_delay: float = 10.0, jitter: float = 0.3) -> float:
-    """Экспоненциальный backoff с джиттером: base * 2^(attempt-1), ±jitter%."""
-    delay = min(base * (2 ** (attempt - 1)), max_delay)
-    return delay * (1 + random.uniform(-jitter, jitter))
-
-
-def async_retry(
-    retries: int = 3,
-    base: float = 0.5,
-    retry_on: tuple[type[Exception], ...] = (Exception,),
-):
-    """Декоратор для асинхронных функций: повторы с экспоненциальным backoff."""
-
-    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> T:
-            last: Exception | None = None
-            for attempt in range(1, retries + 1):
-                try:
-                    return await func(*args, **kwargs)
-                except retry_on as exc:
-                    last = exc
-                    if attempt == retries:
-                        break
-                    delay = backoff(attempt, base=base)
-                    logger.debug(
-                        "%s: попытка %d/%d не удалась (%s), повтор через %.1fs",
-                        func.__name__, attempt, retries, exc, delay,
-                    )
-                    await asyncio.sleep(delay)
-            assert last is not None
-            raise last
-
-        return wrapper
-
-    return decorator
-
-======================================================================
-ФАЙЛ: project11_marketplace_compare\adapters\__init__.py
-======================================================================
-"""Адаптеры маркетплейсов: единый интерфейс search(query) -> list[Product]."""
-from adapters.ozon import MockOzonAdapter, OzonAdapter
-from adapters.wb import MockWbAdapter, WbAdapter
-from adapters.yandex import MockYandexAdapter, YandexAdapter
-
-__all__ = [
-    "OzonAdapter", "MockOzonAdapter",
-    "WbAdapter", "MockWbAdapter",
-    "YandexAdapter", "MockYandexAdapter",
-]
-
-======================================================================
-ФАЙЛ: project11_marketplace_compare\adapters\base.py
-======================================================================
-"""Общая HTTP-обвязка адаптеров: транспорты httpx/curl_cffi, retry, заголовки.
-
-Транспорты и логика повторов общие для всех маркетплейсов — по одному клиенту на
-маркетплейс, чтобы не дублировать код. Антибот-ситуация описана в README:
-оба публичных API защищены, поэтому предусмотрен прокси и демо-режим.
-"""
-from __future__ import annotations
-
-import asyncio
-import logging
-
-import config
-
-logger = logging.getLogger(__name__)
-
-# Заголовки «как у браузера». User-Agent при curl_cffi выставляет имитация
-# Chrome (ручной UA сломал бы отпечаток).
-BROWSER_HEADERS = {
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "same-site",
-}
-
-_RETRY_STATUSES = {429, *range(500, 600)}
-
-
-def _backoff(attempt: int, min_delay: float = 0.5) -> float:
-    """Экспоненциальная задержка: 0.5, 1.0, 2.0 … (потолок 10 c)."""
-    return min(min_delay * (2 ** (attempt - 1)), 10.0)
-
-
-try:
-    from curl_cffi.requests import AsyncSession as CurlCffiSession
-
-    HAS_CURL_CFFI = True
-except ImportError:  # pragma: no cover
-    CurlCffiSession = None
-    HAS_CURL_CFFI = False
-
-
-class HttpxTransport:
-    """Транспорт на httpx (без имитации отпечатка)."""
-
-    def __init__(self, timeout: float = 20.0, proxy: str = "") -> None:
-        import httpx
-
-        self._client = httpx.AsyncClient(timeout=timeout, proxy=proxy or None)
-
-    async def get(self, url: str, *, params=None, headers=None) -> tuple[int, str]:
-        resp = await self._client.get(url, params=params, headers=headers)
-        return resp.status_code, resp.text
-
-    async def aclose(self) -> None:
-        await self._client.aclose()
-
-
-class CurlCffiTransport:
-    """Транспорт на curl_cffi: имитация TLS/HTTP2-отпечатка Chrome."""
-
-    def __init__(
-        self,
-        timeout: float = 20.0,
-        impersonate: str = "chrome",
-        proxies: dict | None = None,
-    ) -> None:
-        self._session = CurlCffiSession(
-            impersonate=impersonate,
-            timeout=timeout,
-            proxies=proxies,
-        )
-
-    async def get(self, url: str, *, params=None, headers=None) -> tuple[int, str]:
-        resp = await self._session.get(
-            url, params=params, headers=headers, allow_redirects=False
-        )
-        return resp.status_code, resp.text
-
-    async def aclose(self) -> None:
-        closer = getattr(self._session, "aclose", None) or self._session.close
-        await closer()
-
-
-def _make_transport() -> HttpxTransport | CurlCffiTransport:
-    """Выбирает транспорт по MARKET_HTTP_CLIENT (curl_cffi по умолчанию)."""
-    if config.HTTP_CLIENT == "curl_cffi":
-        if not HAS_CURL_CFFI:
-            logger.warning(
-                "MARKET_HTTP_CLIENT=curl_cffi, но библиотека не установлена. "
-                "Падаем обратно на httpx. Установите: pip install curl_cffi"
-            )
-        else:
-            proxies = None
-            if config.PROXY:
-                proxies = {"http": config.PROXY, "https": config.PROXY}
-            return CurlCffiTransport(proxies=proxies)
-    return HttpxTransport(proxy=config.PROXY)
-
-
-class BaseAdapter:
-    """Базовый HTTP-адаптер: GET с retry на 429/5xx и сетевые ошибки."""
-
-    name = "base"
-    # Заголовки по умолчанию; адаптеры переопределяют (см. wb.py/ozon.py),
-    # добавляя специфичные для маркетплейса (Referer, Origin, x-o3-app-name).
-    headers = BROWSER_HEADERS
-
-    def __init__(self, transport=None, max_retries: int | None = None) -> None:
-        self._transport = transport if transport is not None else _make_transport()
-        self._max_retries = max_retries if max_retries is not None else config.MAX_RETRIES
-
-    async def _get(self, url: str, *, params=None, retries: int | None = None,
-               extra_headers: dict | None = None) -> tuple[int, str]:
-        max_retries = self._max_retries if retries is None else retries
-        last_exc: Exception | None = None
-        for attempt in range(1, max_retries + 1):
-            try:
-                status, text = await self._transport.get(
-                    url, params=params, headers={**self.headers, **(extra_headers or {})}
-                )
-            except Exception as exc:
-                last_exc = exc
-                if attempt == max_retries:
-                    raise
-                await asyncio.sleep(_backoff(attempt))
-                continue
-            if status in _RETRY_STATUSES and attempt < max_retries:
-                await asyncio.sleep(_backoff(attempt))
-                continue
-            return status, text
-        raise last_exc if last_exc is not None else RuntimeError("unreachable")
-
-    async def search(self, query: str, limit: int = 5) -> list:
-        """Поиск товаров по запросу. Возвращает список Product."""
-        raise NotImplementedError
-
-    async def aclose(self) -> None:
-        await self._transport.aclose()
-
-======================================================================
-ФАЙЛ: project11_marketplace_compare\adapters\ozon.py
-======================================================================
-"""Адаптер Ozon: поиск товаров по названию.
-
-Использует публичный composer-api (www.ozon.ru/api/composer-api.bx/page/json/v2,
-url=/search/?text=...). Ответ — словарь widgetStates, где каждый виджет это
-JSON-строка; товары живут в виджетах с префиксом "webSearchResults".
-Структура Ozon нестабильна, поэтому парсер ищет объекты product рекурсивно.
-
-Честный статус: с IP без валидного region-cookie composer-api отдаёт
-HTTP 307 (редирект-петля антибота) — адаптер возвращает пустую выдачу;
-решение — прокси (MARKET_PROXY) или демо-режим.
-"""
-from __future__ import annotations
-
-import json
-import logging
-import zlib
-
-from adapters.base import BROWSER_HEADERS, BaseAdapter
-from models import Product
-
-logger = logging.getLogger(__name__)
-
-COMPOSER_API_URL = "https://www.ozon.ru/api/composer-api.bx/page/json/v2"
-
-def _iter_widget_states(data: dict):
-    """Итерирует (ключ_виджета, распарсенный_json) из widgetStates."""
-    for key, raw in (data.get("widgetStates") or {}).items():
-        if not isinstance(raw, str):
-            continue
-        try:
-            yield key, json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
-            continue
-
-
-def _find_products(node, acc: list[dict], depth: int = 0) -> None:
-    """Рекурсивно собирает объекты, похожие на товар Ozon (есть id и title)."""
-    if depth > 8:
-        return
-    if isinstance(node, dict):
-        if "product" in node and isinstance(node["product"], dict):
-            acc.append(node["product"])
-        for value in node.values():
-            _find_products(value, acc, depth + 1)
-    elif isinstance(node, list):
-        for item in node:
-            _find_products(item, acc, depth + 1)
-
-
-def _to_rubles(value) -> int | None:
-    """Нормализует цену Ozon в целые рубли (строки рублей или копейки)."""
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, dict):
-        value = value.get("value") or value.get("price")
-    if isinstance(value, (int, float)):
-        if isinstance(value, float):
-            return int(round(value))
-        return value if value < 100000 else value // 100
-    s = str(value).replace("\u00a0", " ").replace(" ", "").replace(",", ".").strip()
-    if not s or not s.replace(".", "").isdigit():
-        return None
-    num = float(s)
-    if num < 100000 and "." in s and len(s.split(".")[-1]) <= 2:
-        return int(round(num))
-    if num >= 100000:
-        return int(num // 100)
-    return int(round(num))
-
-
-class OzonAdapter(BaseAdapter):
-    """Поиск по Ozon через публичный composer-api."""
-
-    name = "ozon"
-    # Ozon ожидает заголовок x-o3-app-name (как у приложения/веба)
-    headers = {
-        **BROWSER_HEADERS,
-        "Referer": "https://www.ozon.ru/",
-        "Origin": "https://www.ozon.ru",
-        "x-o3-app-name": "rich",
-    }
-
-    async def search(self, query: str, limit: int = 5) -> list[Product]:
-        params = {"url": f"/search/?text={query}"}
-        status, text = await self._get(COMPOSER_API_URL, params=params)
-        if status == 307:
-            logger.warning(
-                "Ozon composer-api -> HTTP 307 для запроса %r: регион-блок", query
-            )
-            return []
-        if status != 200:
-            logger.warning("Ozon composer-api -> HTTP %s для запроса %r", status, query)
-            return []
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError:
-            logger.warning("Ozon composer-api вернул не-JSON для запроса %r", query)
-            return []
-        return self._parse_response(data, limit)
-
-    def _parse_response(self, data: dict, limit: int) -> list[Product]:
-        """Собирает товары из search-виджетов composer-ответа."""
-        products: list[Product] = []
-        seen: set[str] = set()
-        for key, widget in _iter_widget_states(data):
-            if not key.startswith("webSearchResults"):
-                continue
-            raw_products: list[dict] = []
-            _find_products(widget, raw_products)
-            for raw in raw_products:
-                product = self.parse_product(raw)
-                if product is None or product.ext_id in seen:
-                    continue
-                seen.add(product.ext_id)
-                products.append(product)
-                if len(products) >= limit:
-                    return products
-        return products
-
-    @staticmethod
-    def parse_product(raw: dict) -> Product | None:
-        """Сырой товар Ozon -> Product."""
-        pid = raw.get("id") or raw.get("ext_id")
-        if pid is None:
-            return None
-        title = raw.get("title") or raw.get("name") or "—"
-        price_block = raw.get("price") or {}
-        price = _to_rubles(price_block.get("price") or price_block.get("value"))
-        old_price = _to_rubles(
-            price_block.get("oldPrice")
-            or price_block.get("old_price")
-            or raw.get("old_price")
-            or raw.get("oldPrice")
-        )
-        stock = _to_rubles(raw.get("stockCount"))
-        if stock is None:
-            stocks = raw.get("stocks")
-            stock = _to_rubles(stocks.get("total")) if isinstance(stocks, dict) else None
-        return Product(
-            marketplace="ozon",
-            ext_id=str(pid),
-            title=str(title),
-            price=price if price is not None else 0,
-            old_price=old_price,
-            url=f"https://www.ozon.ru/product/{pid}/",
-            stock=stock,
-            rating=None,
-        )
-
-
-class MockOzonAdapter:
-    """Демо-режим: детерминированная выдуманная выдача по запросу."""
-
-    name = "ozon"
-
-    async def search(self, query: str, limit: int = 5) -> list[Product]:
-        # zlib.crc32 вместо hash(): хэш строк рандомизируется между процессами
-        seed = zlib.crc32(query.lower().encode("utf-8")) % 100
-        base = 4700 + (seed * 29) % 3000
-        return [
-            Product(
-                marketplace="ozon",
-                ext_id=f"oz-{seed}-{i}",
-                title=f"{query.title()} — вариант {i + 1} (Ozon, mock)",
-                price=base + i * 200,
-                old_price=base + i * 200 + 1200,
-                url=f"https://www.ozon.ru/product/{seed}{i}/",
-                stock=(seed + i * 5) % 25,
-                rating=round(3.8 + (seed % 12) / 10, 1),
-            )
-            for i in range(limit)
-        ]
-
-    async def aclose(self) -> None:
-        return None
-
-======================================================================
-ФАЙЛ: project11_marketplace_compare\adapters\wb.py
-======================================================================
-"""Адаптер Wildberries: поиск товаров по названию.
-
-Использует публичный эндпоинт search.wb.ru (как в Проекте 1). Цены WB
-приходят в КОПЕЙКАХ (priceU / salePriceU) — делим на 100. С заблокированного
-IP эдж отдаёт HTTP 429/403 или «фейковую» пустоту с кодом 200 — в этих
-случаях адаптер возвращает пустую выдачу, а не падает.
-"""
-from __future__ import annotations
-
-import json
-import logging
-import zlib
-
-from adapters.base import BROWSER_HEADERS, BaseAdapter
-from models import Product
-
-logger = logging.getLogger(__name__)
-
-SEARCH_API_URL = "https://search.wb.ru/exactmatch/ru/common/v4/search"
-
-DEFAULT_PARAMS = {
-    "appType": "1",
-    "curr": "rub",
-    "dest": "-1257786",
-    "spp": "30",
-}
-
-class WbAdapter(BaseAdapter):
-    """Поиск по Wildberries через публичный API поиска."""
-
-    name = "wb"
-    # Заголовки WB: сайт wildberries.ru (Origin same-site для search.wb.ru)
-    headers = {
-        **BROWSER_HEADERS,
-        "Referer": "https://www.wildberries.ru/",
-        "Origin": "https://www.wildberries.ru",
-    }
-
-    async def search(self, query: str, limit: int = 5) -> list[Product]:
-        params = {
-            **DEFAULT_PARAMS,
-            "query": query,
-            "resultset": "catalog",
-            "sort": "popular",
-            "page": "1",
-        }
-        status, text = await self._get(SEARCH_API_URL, params=params)
-        if status != 200:
-            logger.warning("search.wb.ru -> HTTP %s для запроса %r", status, query)
-            return []
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError:
-            logger.warning("search.wb.ru вернул не-JSON для запроса %r", query)
-            return []
-        products = (data.get("data") or {}).get("products") or []
-        return [p for p in (self._parse(p) for p in products[:limit]) if p is not None]
-
-    @staticmethod
-    def parse_product(raw: dict) -> Product | None:
-        """Сырой товар WB -> Product (цены из копеек в рубли)."""
-        pid = raw.get("id")
-        if pid is None:
-            return None
-        price_u = int(raw.get("priceU", 0) or 0)
-        sale_price_u = int(raw.get("salePriceU", price_u) or price_u)
-        return Product(
-            marketplace="wb",
-            ext_id=str(pid),
-            title=str(raw.get("name") or "—"),
-            price=sale_price_u // 100,
-            old_price=(price_u // 100) if price_u else None,
-            url=f"https://www.wildberries.ru/catalog/{pid}/detail.aspx",
-            stock=int(raw.get("qty", 0) or 0) or None,
-            rating=raw.get("rating"),
-        )
-
-    _parse = parse_product
-
-
-class MockWbAdapter:
-    """Демо-режим: детерминированная выдуманная выдача по запросу."""
-
-    name = "wb"
-
-    async def search(self, query: str, limit: int = 5) -> list[Product]:
-        # zlib.crc32 вместо hash(): хэш строк рандомизируется между процессами
-        seed = zlib.crc32(query.lower().encode("utf-8")) % 100
-        base = 5000 + seed * 37
-        return [
-            Product(
-                marketplace="wb",
-                ext_id=f"wb-{seed}-{i}",
-                title=f"{query.title()} — вариант {i + 1} (WB, mock)",
-                price=base + i * 250,
-                old_price=base + i * 250 + 1500,
-                url=f"https://www.wildberries.ru/catalog/{seed}{i}/detail.aspx",
-                stock=(seed + i * 3) % 40,
-                rating=round(4.0 + (seed % 10) / 10, 1),
-            )
-            for i in range(limit)
-        ]
-
-    async def aclose(self) -> None:
-        return None
-
-======================================================================
-ФАЙЛ: project11_marketplace_compare\adapters\yandex.py
-======================================================================
-"""Адаптер Yandex Market: поиск товаров по названию.
-
-Использует официальное публичное API Yandex Market
-(https://api.content.market.yandex.ru/v2/models) — бесплатное, но требует
-API-ключ (выдаётся в кабинете разработчика Yandex). Ключ передаётся в
-заголовке Authorization без префикса Bearer.
-
-Без ключа API отвечает HTTP 401 — адаптер возвращает пустую выдачу и
-логирует предупреждение (бот продолжает работать с остальными площадками).
-Цены в ответе — числа в рублях с дробной частью ("value": 5499.0) —
-округляются до целых рублей.
-"""
-from __future__ import annotations
-
-import json
-import logging
-import zlib
-
-from adapters.base import BaseAdapter
-from models import Product
-
-logger = logging.getLogger(__name__)
-
-SEARCH_API_URL = "https://api.content.market.yandex.ru/v2/models"
-
-
-class YandexAdapter(BaseAdapter):
-    """Поиск по Yandex Market через официальное публичное API (по ключу)."""
-
-    name = "yandex"
-
-    def __init__(self, api_key: str = "", region_id: int = 213, transport=None,
-                 max_retries: int | None = None) -> None:
-        super().__init__(transport=transport, max_retries=max_retries)
-        self._api_key = api_key
-        self._region_id = region_id
-
-    async def search(self, query: str, limit: int = 5) -> list[Product]:
-        if not self._api_key:
-            logger.warning(
-                "MARKET_YANDEX_API_KEY не задан — Yandex Market пропущен. "
-                "Ключ выдаётся бесплатно в кабинете разработчика Yandex."
-            )
-            return []
-        params = {"query": query, "regionId": self._region_id}
-        extra_headers = {"Authorization": self._api_key}
-        status, text = await self._get(SEARCH_API_URL, params=params, extra_headers=extra_headers)
-        if status == 401:
-            logger.warning("Yandex Market -> HTTP 401: ключ недействителен")
-            return []
-        if status != 200:
-            logger.warning("Yandex Market -> HTTP %s для запроса %r", status, query)
-            return []
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError:
-            logger.warning("Yandex Market вернул не-JSON для запроса %r", query)
-            return []
-        items = data.get("items") or []
-        return [p for p in (self.parse_product(i) for i in items[:limit]) if p is not None]
-
-    @staticmethod
-    def parse_product(raw: dict) -> Product | None:
-        """Сырой товар Yandex Market -> Product (цены округляются до рублей)."""
-        pid = raw.get("id")
-        if pid is None:
-            return None
-        prices = raw.get("prices") or {}
-        price = prices.get("value")
-        old_price = prices.get("oldValue") or (prices.get("discount") or {}).get("oldValue")
-        link = raw.get("link") or f"https://market.yandex.ru/product/{pid}/"
-        return Product(
-            marketplace="yandex",
-            ext_id=str(pid),
-            title=str(raw.get("name") or "—"),
-            price=int(round(price)) if isinstance(price, (int, float)) else 0,
-            old_price=int(round(old_price)) if isinstance(old_price, (int, float)) else None,
-            url=str(link),
-            stock=None,  # публичное API не отдаёт остатки
-            rating=raw.get("rating"),
-        )
-
-
-class MockYandexAdapter:
-    """Демо-режим: детерминированная выдуманная выдача по запросу."""
-
-    name = "yandex"
-
-    async def search(self, query: str, limit: int = 5) -> list[Product]:
-        seed = zlib.crc32(query.lower().encode("utf-8")) % 100
-        base = 5200 + (seed * 17) % 2500
-        return [
-            Product(
-                marketplace="yandex",
-                ext_id=f"ya-{seed}-{i}",
-                title=f"{query.title()} — вариант {i + 1} (Яндекс Маркет, mock)",
-                price=base + i * 180,
-                old_price=base + i * 180 + 1000,
-                url=f"https://market.yandex.ru/product/{seed}{i}/",
-                stock=None,
-                rating=round(4.2 + (seed % 8) / 10, 1),
-            )
-            for i in range(limit)
-        ]
-
-    async def aclose(self) -> None:
-        return None
-
-======================================================================
 ФАЙЛ: project11_marketplace_compare\tests\conftest.py
 ======================================================================
 """Делает модули проекта импортируемыми для pytest."""
@@ -4952,6 +4871,97 @@ def test_watch_requires_query(tmp_path) -> None:
     asyncio.run(run())
 
 ======================================================================
+ФАЙЛ: project11_marketplace_compare\utils.py
+======================================================================
+"""Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером."""
+from __future__ import annotations
+
+import asyncio
+import functools
+import logging
+import random
+import time
+from typing import Any, Awaitable, Callable, TypeVar
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+class TTLCache:
+    """Простейший TTL-кэш: значение живёт ttl секунд после записи."""
+
+    def __init__(self, ttl_seconds: float = 300.0) -> None:
+        self._ttl = ttl_seconds
+        self._store: dict[Any, tuple[float, Any]] = {}
+
+    def get(self, key: Any) -> Any | None:
+        item = self._store.get(key)
+        if item is None:
+            return None
+        expires, value = item
+        if time.monotonic() > expires:
+            self._store.pop(key, None)
+            return None
+        return value
+
+    async def get_or_set(self, key: Any, factory: Callable[[], Awaitable[T]]) -> T:
+        cached = self.get(key)
+        if cached is not None:
+            return cached
+        value = await factory()
+        self._store[key] = (time.monotonic() + self._ttl, value)
+        return value
+
+    def invalidate(self, key: Any | None = None) -> None:
+        if key is None:
+            self._store.clear()
+        else:
+            self._store.pop(key, None)
+
+    @property
+    def size(self) -> int:
+        return len(self._store)
+
+
+def backoff(attempt: int, base: float = 0.5, max_delay: float = 10.0, jitter: float = 0.3) -> float:
+    """Экспоненциальный backoff с джиттером: base * 2^(attempt-1), ±jitter%."""
+    delay = min(base * (2 ** (attempt - 1)), max_delay)
+    return delay * (1 + random.uniform(-jitter, jitter))
+
+
+def async_retry(
+    retries: int = 3,
+    base: float = 0.5,
+    retry_on: tuple[type[Exception], ...] = (Exception,),
+):
+    """Декоратор для асинхронных функций: повторы с экспоненциальным backoff."""
+
+    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+        @functools.wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> T:
+            last: Exception | None = None
+            for attempt in range(1, retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except retry_on as exc:
+                    last = exc
+                    if attempt == retries:
+                        break
+                    delay = backoff(attempt, base=base)
+                    logger.debug(
+                        "%s: попытка %d/%d не удалась (%s), повтор через %.1fs",
+                        func.__name__, attempt, retries, exc, delay,
+                    )
+                    await asyncio.sleep(delay)
+            assert last is not None
+            raise last
+
+        return wrapper
+
+    return decorator
+
+======================================================================
 ФАЙЛ: project1_wb_price_tracker\.dockerignore
 ======================================================================
 .env
@@ -5041,6 +5051,11 @@ CMD ["python", "bot.py"]
 Telegram-бот для мониторинга цен и остатков на Wildberries. При отправке артикула бот сохраняет товар в базу данных, ежедневно проверяет цену и остатки и уведомляет пользователя о снижении цены или исчерпании товара.
 
 Проект реализован по учебному техническому заданию («трекер цен с push-уведомлением раз в сутки»). В процессе разработки выявлены ограничения публичного API Wildberries, связанные с защитой от автоматизированных запросов; подробности приведены ниже.
+
+## 🕹 Живое демо
+
+Попробовать вживую: **[@dfs12f_bot](https://t.me/dfs12f_bot)** — демо-бот портфолио на общем токене.
+Локальный запуск — `run_bot1.cmd` (см. раздел «Запуск»). Примечание: в портфолио один токен на все боты, поэтому одновременно в сети может находиться только один проект.
 
 ## Команды
 
@@ -5867,6 +5882,229 @@ rem 3) restart this script. Check access with the /diag command in Telegram.
 ..\.venv\Scripts\python.exe -u bot.py
 
 ======================================================================
+ФАЙЛ: project1_wb_price_tracker\tests\conftest.py
+======================================================================
+"""Делает модули проекта импортируемыми для pytest."""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+======================================================================
+ФАЙЛ: project1_wb_price_tracker\tests\test_smoke.py
+======================================================================
+"""Тесты P1: БД (aiosqlite), клиент WB, продвинутые утилиты и мидлвары.
+
+Запуск: python -m pytest tests -q
+"""
+import asyncio
+import json
+import os
+import tempfile
+from datetime import datetime, timedelta, timezone
+
+from alerts import should_notify
+from db import Database
+from middlewares import ThrottlingMiddleware
+from utils import TTLCache
+from wb_api import MockWBClient, WBClient
+
+ARTICUL = 17457977
+
+
+class FakeTransport:
+    """Транспорт-заглушка: отдаёт заранее заданные ответы по порядку."""
+
+    def __init__(self, responses: list[tuple[int, str]]) -> None:
+        self.responses = responses
+        self.calls: list[str] = []
+
+    async def get(self, url: str, *, params=None, headers=None) -> tuple[int, str]:
+        self.calls.append(url)
+        if not self.responses:
+            raise RuntimeError("FakeTransport: пустой список ответов")
+        idx = min(len(self.calls) - 1, len(self.responses) - 1)
+        return self.responses[idx]
+
+    async def aclose(self) -> None:
+        return None
+
+
+# ------------------------------------------------------------ базовые smoke-тесты
+
+def test_mock_card_prices_in_kopecks() -> None:
+    """Цены WB приходят в копейках — проверяем деление на 100."""
+    card = asyncio.run(MockWBClient().get_card(ARTICUL))
+    assert card["salePriceU"] // 100 == 699
+    assert card["priceU"] // 100 == 999
+
+
+def test_db_roundtrip(tmp_path) -> None:
+    """Полный цикл: добавление карточки, трекинг, история, отписка, статистика."""
+    async def run() -> None:
+        db = Database(str(tmp_path / "tracker.db"))
+        await db.init()
+        card = await MockWBClient().get_card(ARTICUL)
+        await db.upsert_item(card)
+        await db.track(111, str(ARTICUL))
+        assert await db.list_tracked(111)
+        assert await db.history(str(ARTICUL))
+        assert await db.users_for_articul(str(ARTICUL)) == [111]
+        assert await db.untrack(111, str(ARTICUL))
+        s = await db.stats()
+        assert s["items"] >= 1 and s["history"] >= 1
+
+    asyncio.run(run())
+
+
+def test_extract_product_payload_and_data() -> None:
+    """Парсер устойчив к смене структуры ответа WB (payload vs data)."""
+    client = WBClient(transport=FakeTransport([]))
+    assert client._extract_product({"payload": {"products": [{"id": 1}]}}) == {"id": 1}
+    assert client._extract_product({"data": {"products": [{"id": 2}]}}) == {"id": 2}
+    assert client._extract_product({"data": {"products": []}}) is None
+    assert client._extract_product({"error": "blocked"}) is None
+
+
+def test_fallback_to_search_when_card_blocked() -> None:
+    """Если card.wb.ru отдаёт 403 (IP-блок), клиент пробует search.wb.ru."""
+    card_blocked = (403, "403 Forbidden")
+    search_ok = (
+        200,
+        json.dumps(
+            {
+                "data": {
+                    "products": [
+                        {
+                            "id": ARTICUL,
+                            "name": "Настоящий товар",
+                            "priceU": 99900,
+                            "salePriceU": 69900,
+                            "qty": 3,
+                        }
+                    ]
+                }
+            }
+        ),
+    )
+    transport = FakeTransport([card_blocked, search_ok])
+    client = WBClient(transport=transport, max_retries=2)
+    card = asyncio.run(client.get_card(ARTICUL))
+    assert card is not None
+    assert card["salePriceU"] == 69900  # копейки
+    assert len(transport.calls) == 2  # сначала card, затем search
+    assert "search.wb.ru" in transport.calls[1]
+
+
+def test_no_product_returns_none() -> None:
+    """Если оба эндпоинта не дали товара — возвращаем None без исключения."""
+    transport = FakeTransport([(403, "blocked"), (200, json.dumps({"data": {"products": []}}))])
+    client = WBClient(transport=transport, max_retries=2)
+    assert asyncio.run(client.get_card(ARTICUL)) is None
+
+
+# ------------------------------------------------------------ продвинутый уровень
+
+def test_ttl_cache() -> None:
+    """Значение живёт ttl секунд, потом пересчитывается."""
+    async def run() -> None:
+        cache = TTLCache(ttl_seconds=0.05)
+        calls = 0
+
+        async def factory():
+            nonlocal calls
+            calls += 1
+            return calls
+
+        assert await cache.get_or_set("k", factory) == 1
+        assert await cache.get_or_set("k", factory) == 1  # из кэша
+        assert calls == 1
+        await asyncio.sleep(0.08)
+        assert await cache.get_or_set("k", factory) == 2  # TTL истёк
+        cache.invalidate("k")
+        assert await cache.get_or_set("k", factory) == 3  # явный сброс
+
+    asyncio.run(run())
+
+
+class _FakeUser:
+    id = 1
+
+
+class _FakeEvent:
+    from_user = _FakeUser()
+
+
+async def _dummy_handler(event, data):
+    return "ok"
+
+
+def test_throttling_middleware() -> None:
+    """Второе сообщение в пределах интервала дропается."""
+    async def run() -> None:
+        mw = ThrottlingMiddleware(min_interval=60.0)
+        assert await mw(_dummy_handler, _FakeEvent(), {}) == "ok"
+        assert await mw(_dummy_handler, _FakeEvent(), {}) is None  # дропнут
+
+    asyncio.run(run())
+
+
+def test_should_notify_logic() -> None:
+    """Чистая логика алертов: падение цены, заканчивается, кулдаун."""
+    now = datetime.now(timezone.utc)
+
+    # падение цены — уведомляем
+    notify, msgs = should_notify(100, 10, last_price=120, last_qty=10,
+                                 last_alert_at=None, now=now)
+    assert notify and len(msgs) == 1 and "упала" in msgs[0]
+
+    # товар заканчивается
+    notify, msgs = should_notify(100, 2, last_price=100, last_qty=10,
+                                 last_alert_at=None, now=now)
+    assert notify and "заканчивается" in msgs[0]
+
+    # цена выросла и остаток норм — тишина
+    notify, _ = should_notify(130, 10, last_price=120, last_qty=10,
+                              last_alert_at=None, now=now)
+    assert not notify
+
+    # кулдаун: уведомляли час назад — молчим
+    alert_1h_ago = (now - timedelta(hours=1)).isoformat()
+    notify, _ = should_notify(100, 10, last_price=120, last_qty=10,
+                              last_alert_at=alert_1h_ago, now=now, cooldown_hours=6)
+    assert not notify
+
+    # кулдаун истёк (7 часов назад) — уведомляем снова
+    alert_7h_ago = (now - timedelta(hours=7)).isoformat()
+    notify, _ = should_notify(100, 10, last_price=120, last_qty=10,
+                              last_alert_at=alert_7h_ago, now=now, cooldown_hours=6)
+    assert notify
+
+
+def test_cleanup_history(tmp_path) -> None:
+    """История старше N дней удаляется, свежая остаётся."""
+    async def run() -> None:
+        db = Database(str(tmp_path / "tracker.db"))
+        await db.init()
+        # пишем запись напрямую с «древней» датой
+        import aiosqlite
+        async with aiosqlite.connect(db.path) as conn:
+            old = (datetime.now(timezone.utc) - timedelta(days=40)).isoformat(timespec="seconds")
+            await conn.execute(
+                "INSERT INTO price_history (articul, price, sale_price, qty, checked_at) "
+                "VALUES ('111', 100, 90, 5, ?)", (old,)
+            )
+            await conn.commit()
+        card = await MockWBClient().get_card(ARTICUL)
+        await db.upsert_item(card)  # свежая запись
+
+        deleted = await db.cleanup_history(keep_days=30)
+        assert deleted == 1  # удалилась только древняя
+        assert len(await db.history(str(ARTICUL))) == 1  # свежая на месте
+
+    asyncio.run(run())
+
+======================================================================
 ФАЙЛ: project1_wb_price_tracker\utils.py
 ======================================================================
 """Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером.
@@ -6285,229 +6523,6 @@ class MockWBClient:
         return None
 
 ======================================================================
-ФАЙЛ: project1_wb_price_tracker\tests\conftest.py
-======================================================================
-"""Делает модули проекта импортируемыми для pytest."""
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-======================================================================
-ФАЙЛ: project1_wb_price_tracker\tests\test_smoke.py
-======================================================================
-"""Тесты P1: БД (aiosqlite), клиент WB, продвинутые утилиты и мидлвары.
-
-Запуск: python -m pytest tests -q
-"""
-import asyncio
-import json
-import os
-import tempfile
-from datetime import datetime, timedelta, timezone
-
-from alerts import should_notify
-from db import Database
-from middlewares import ThrottlingMiddleware
-from utils import TTLCache
-from wb_api import MockWBClient, WBClient
-
-ARTICUL = 17457977
-
-
-class FakeTransport:
-    """Транспорт-заглушка: отдаёт заранее заданные ответы по порядку."""
-
-    def __init__(self, responses: list[tuple[int, str]]) -> None:
-        self.responses = responses
-        self.calls: list[str] = []
-
-    async def get(self, url: str, *, params=None, headers=None) -> tuple[int, str]:
-        self.calls.append(url)
-        if not self.responses:
-            raise RuntimeError("FakeTransport: пустой список ответов")
-        idx = min(len(self.calls) - 1, len(self.responses) - 1)
-        return self.responses[idx]
-
-    async def aclose(self) -> None:
-        return None
-
-
-# ------------------------------------------------------------ базовые smoke-тесты
-
-def test_mock_card_prices_in_kopecks() -> None:
-    """Цены WB приходят в копейках — проверяем деление на 100."""
-    card = asyncio.run(MockWBClient().get_card(ARTICUL))
-    assert card["salePriceU"] // 100 == 699
-    assert card["priceU"] // 100 == 999
-
-
-def test_db_roundtrip(tmp_path) -> None:
-    """Полный цикл: добавление карточки, трекинг, история, отписка, статистика."""
-    async def run() -> None:
-        db = Database(str(tmp_path / "tracker.db"))
-        await db.init()
-        card = await MockWBClient().get_card(ARTICUL)
-        await db.upsert_item(card)
-        await db.track(111, str(ARTICUL))
-        assert await db.list_tracked(111)
-        assert await db.history(str(ARTICUL))
-        assert await db.users_for_articul(str(ARTICUL)) == [111]
-        assert await db.untrack(111, str(ARTICUL))
-        s = await db.stats()
-        assert s["items"] >= 1 and s["history"] >= 1
-
-    asyncio.run(run())
-
-
-def test_extract_product_payload_and_data() -> None:
-    """Парсер устойчив к смене структуры ответа WB (payload vs data)."""
-    client = WBClient(transport=FakeTransport([]))
-    assert client._extract_product({"payload": {"products": [{"id": 1}]}}) == {"id": 1}
-    assert client._extract_product({"data": {"products": [{"id": 2}]}}) == {"id": 2}
-    assert client._extract_product({"data": {"products": []}}) is None
-    assert client._extract_product({"error": "blocked"}) is None
-
-
-def test_fallback_to_search_when_card_blocked() -> None:
-    """Если card.wb.ru отдаёт 403 (IP-блок), клиент пробует search.wb.ru."""
-    card_blocked = (403, "403 Forbidden")
-    search_ok = (
-        200,
-        json.dumps(
-            {
-                "data": {
-                    "products": [
-                        {
-                            "id": ARTICUL,
-                            "name": "Настоящий товар",
-                            "priceU": 99900,
-                            "salePriceU": 69900,
-                            "qty": 3,
-                        }
-                    ]
-                }
-            }
-        ),
-    )
-    transport = FakeTransport([card_blocked, search_ok])
-    client = WBClient(transport=transport, max_retries=2)
-    card = asyncio.run(client.get_card(ARTICUL))
-    assert card is not None
-    assert card["salePriceU"] == 69900  # копейки
-    assert len(transport.calls) == 2  # сначала card, затем search
-    assert "search.wb.ru" in transport.calls[1]
-
-
-def test_no_product_returns_none() -> None:
-    """Если оба эндпоинта не дали товара — возвращаем None без исключения."""
-    transport = FakeTransport([(403, "blocked"), (200, json.dumps({"data": {"products": []}}))])
-    client = WBClient(transport=transport, max_retries=2)
-    assert asyncio.run(client.get_card(ARTICUL)) is None
-
-
-# ------------------------------------------------------------ продвинутый уровень
-
-def test_ttl_cache() -> None:
-    """Значение живёт ttl секунд, потом пересчитывается."""
-    async def run() -> None:
-        cache = TTLCache(ttl_seconds=0.05)
-        calls = 0
-
-        async def factory():
-            nonlocal calls
-            calls += 1
-            return calls
-
-        assert await cache.get_or_set("k", factory) == 1
-        assert await cache.get_or_set("k", factory) == 1  # из кэша
-        assert calls == 1
-        await asyncio.sleep(0.08)
-        assert await cache.get_or_set("k", factory) == 2  # TTL истёк
-        cache.invalidate("k")
-        assert await cache.get_or_set("k", factory) == 3  # явный сброс
-
-    asyncio.run(run())
-
-
-class _FakeUser:
-    id = 1
-
-
-class _FakeEvent:
-    from_user = _FakeUser()
-
-
-async def _dummy_handler(event, data):
-    return "ok"
-
-
-def test_throttling_middleware() -> None:
-    """Второе сообщение в пределах интервала дропается."""
-    async def run() -> None:
-        mw = ThrottlingMiddleware(min_interval=60.0)
-        assert await mw(_dummy_handler, _FakeEvent(), {}) == "ok"
-        assert await mw(_dummy_handler, _FakeEvent(), {}) is None  # дропнут
-
-    asyncio.run(run())
-
-
-def test_should_notify_logic() -> None:
-    """Чистая логика алертов: падение цены, заканчивается, кулдаун."""
-    now = datetime.now(timezone.utc)
-
-    # падение цены — уведомляем
-    notify, msgs = should_notify(100, 10, last_price=120, last_qty=10,
-                                 last_alert_at=None, now=now)
-    assert notify and len(msgs) == 1 and "упала" in msgs[0]
-
-    # товар заканчивается
-    notify, msgs = should_notify(100, 2, last_price=100, last_qty=10,
-                                 last_alert_at=None, now=now)
-    assert notify and "заканчивается" in msgs[0]
-
-    # цена выросла и остаток норм — тишина
-    notify, _ = should_notify(130, 10, last_price=120, last_qty=10,
-                              last_alert_at=None, now=now)
-    assert not notify
-
-    # кулдаун: уведомляли час назад — молчим
-    alert_1h_ago = (now - timedelta(hours=1)).isoformat()
-    notify, _ = should_notify(100, 10, last_price=120, last_qty=10,
-                              last_alert_at=alert_1h_ago, now=now, cooldown_hours=6)
-    assert not notify
-
-    # кулдаун истёк (7 часов назад) — уведомляем снова
-    alert_7h_ago = (now - timedelta(hours=7)).isoformat()
-    notify, _ = should_notify(100, 10, last_price=120, last_qty=10,
-                              last_alert_at=alert_7h_ago, now=now, cooldown_hours=6)
-    assert notify
-
-
-def test_cleanup_history(tmp_path) -> None:
-    """История старше N дней удаляется, свежая остаётся."""
-    async def run() -> None:
-        db = Database(str(tmp_path / "tracker.db"))
-        await db.init()
-        # пишем запись напрямую с «древней» датой
-        import aiosqlite
-        async with aiosqlite.connect(db.path) as conn:
-            old = (datetime.now(timezone.utc) - timedelta(days=40)).isoformat(timespec="seconds")
-            await conn.execute(
-                "INSERT INTO price_history (articul, price, sale_price, qty, checked_at) "
-                "VALUES ('111', 100, 90, 5, ?)", (old,)
-            )
-            await conn.commit()
-        card = await MockWBClient().get_card(ARTICUL)
-        await db.upsert_item(card)  # свежая запись
-
-        deleted = await db.cleanup_history(keep_days=30)
-        assert deleted == 1  # удалилась только древняя
-        assert len(await db.history(str(ARTICUL))) == 1  # свежая на месте
-
-    asyncio.run(run())
-
-======================================================================
 ФАЙЛ: project2_ai_review_analyst\.dockerignore
 ======================================================================
 .env
@@ -6596,6 +6611,11 @@ CMD ["python", "bot.py"]
 
 Реализация соответствует ТЗ: aiogram + httpx + LLM (YandexGPT или OpenAI) + pydantic для строгой валидации JSON.
 
+## 🕹 Живое демо
+
+Попробовать вживую: **[@dfs12f_bot](https://t.me/dfs12f_bot)** — демо-бот портфолио на общем токене.
+Локальный запуск — `run_bot2.cmd` (см. раздел «Запуск»). Примечание: в портфолио один токен на все боты, поэтому одновременно в сети может находиться только один проект.
+
 ## Команды
 
 - `/analyze 12345678` — анализ по артикулу (или `/analyze https://www.wildberries.ru/catalog/...`)
@@ -6637,7 +6657,7 @@ models.py       — pydantic-модели: ответ LLM, распределе�
 db.py           — SQLite: история анализов
 middlewares.py  — троттлинг и логирование
 config.py       — настройки из переменных окружения
-tests/          — 7 тестов (валидация JSON, цепочка фолбэков, распределение)
+tests/          — 8 тестов (валидация JSON, цепочка фолбэков, распределение, артикул/обрезка)
 ```
 
 ## Технические особенности
@@ -6654,7 +6674,7 @@ tests/          — 7 тестов (валидация JSON, цепочка фо
 
 ## Тесты
 
-`pytest tests/ -q` — 7 тестов. GitHub Actions прогоняет их при каждом push.
+`pytest tests/ -q` — 8 тестов. GitHub Actions прогоняет их при каждом push.
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\bot.py
@@ -6780,7 +6800,17 @@ async def cmd_analyze(message: Message) -> None:
     await status.edit_text(answer)
 
     raw = json.dumps(result.model_dump(), ensure_ascii=False, indent=2)
-    await message.answer(f"<b>JSON (валидирован pydantic):</b>\n<pre>{esc(raw)}</pre>")
+    logger.debug("JSON анализа %s:\n%s", articul, raw)
+    await message.answer(
+        f"<b>JSON (валидирован pydantic):</b>\n<pre>{esc(_truncate(raw))}</pre>"
+    )
+
+
+def _truncate(text: str, limit: int = 3500) -> str:
+    """Обрезает длинный текст под лимит сообщения Telegram (4096 символов)."""
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "\n… [обрезано: полный JSON — в логе бота]"
 
 
 def _fmt_distribution(distribution: dict) -> str:
@@ -7454,92 +7484,6 @@ def mock_reviews(n: int = config.MAX_REVIEWS) -> list[dict]:
     return reviews
 
 ======================================================================
-ФАЙЛ: project2_ai_review_analyst\utils.py
-======================================================================
-"""Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером."""
-from __future__ import annotations
-
-import asyncio
-import functools
-import logging
-import random
-import time
-from typing import Any, Awaitable, Callable, TypeVar
-
-logger = logging.getLogger(__name__)
-
-T = TypeVar("T")
-
-
-class TTLCache:
-    """TTL-кэш: значение живёт ttl секунд после записи."""
-
-    def __init__(self, ttl_seconds: float = 300.0) -> None:
-        self._ttl = ttl_seconds
-        self._store: dict[Any, tuple[float, Any]] = {}
-
-    def get(self, key: Any) -> Any | None:
-        item = self._store.get(key)
-        if item is None:
-            return None
-        expires, value = item
-        if time.monotonic() > expires:
-            self._store.pop(key, None)
-            return None
-        return value
-
-    async def get_or_set(self, key: Any, factory: Callable[[], Awaitable[T]]) -> T:
-        cached = self.get(key)
-        if cached is not None:
-            return cached
-        value = await factory()
-        self._store[key] = (time.monotonic() + self._ttl, value)
-        return value
-
-    def invalidate(self, key: Any | None = None) -> None:
-        if key is None:
-            self._store.clear()
-        else:
-            self._store.pop(key, None)
-
-    @property
-    def size(self) -> int:
-        return len(self._store)
-
-
-def backoff(attempt: int, base: float = 0.5, max_delay: float = 10.0, jitter: float = 0.3) -> float:
-    """Экспоненциальный backoff с джиттером: base * 2^(attempt-1), ±jitter%."""
-    delay = min(base * (2 ** (attempt - 1)), max_delay)
-    return delay * (1 + random.uniform(-jitter, jitter))
-
-
-def async_retry(
-    retries: int = 3,
-    base: float = 0.5,
-    retry_on: tuple[type[Exception], ...] = (Exception,),
-):
-    """Декоратор для асинхронных функций: повторы с экспоненциальным backoff."""
-
-    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> T:
-            last: Exception | None = None
-            for attempt in range(1, retries + 1):
-                try:
-                    return await func(*args, **kwargs)
-                except retry_on as exc:
-                    last = exc
-                    if attempt == retries:
-                        break
-                    await asyncio.sleep(backoff(attempt, base=base))
-            assert last is not None
-            raise last
-
-        return wrapper
-
-    return decorator
-
-======================================================================
 ФАЙЛ: project2_ai_review_analyst\tests\conftest.py
 ======================================================================
 """Делает модули проекта импортируемыми для pytest."""
@@ -7566,6 +7510,24 @@ from llm import (
 )
 from models import AnalysisResult
 from reviews import mock_reviews, reviews_stats
+
+
+def test_extract_articul_and_truncate() -> None:
+    from bot import _extract_articul, _truncate
+
+    # артикул из числа, из ссылки и из ?nm=
+    assert _extract_articul("/analyze 17457977") == 17457977
+    assert _extract_articul(
+        "https://www.wildberries.ru/catalog/17457977/detail.aspx"
+    ) == 17457977
+    assert _extract_articul("wb.ru/?nm=12345678") == 12345678
+    assert _extract_articul("/analyze нет артикула") is None
+
+    # обрезка длинного JSON под лимит Telegram
+    assert _truncate("короткий текст") == "короткий текст"
+    cut = _truncate("x" * 5000, limit=4000)
+    assert len(cut) <= 4000 + 60
+    assert "обрезано" in cut
 
 
 def test_mock_reviews_count() -> None:
@@ -7674,6 +7636,92 @@ def test_reviews_cache_ttl() -> None:
     asyncio.run(run())
 
 ======================================================================
+ФАЙЛ: project2_ai_review_analyst\utils.py
+======================================================================
+"""Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером."""
+from __future__ import annotations
+
+import asyncio
+import functools
+import logging
+import random
+import time
+from typing import Any, Awaitable, Callable, TypeVar
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+class TTLCache:
+    """TTL-кэш: значение живёт ttl секунд после записи."""
+
+    def __init__(self, ttl_seconds: float = 300.0) -> None:
+        self._ttl = ttl_seconds
+        self._store: dict[Any, tuple[float, Any]] = {}
+
+    def get(self, key: Any) -> Any | None:
+        item = self._store.get(key)
+        if item is None:
+            return None
+        expires, value = item
+        if time.monotonic() > expires:
+            self._store.pop(key, None)
+            return None
+        return value
+
+    async def get_or_set(self, key: Any, factory: Callable[[], Awaitable[T]]) -> T:
+        cached = self.get(key)
+        if cached is not None:
+            return cached
+        value = await factory()
+        self._store[key] = (time.monotonic() + self._ttl, value)
+        return value
+
+    def invalidate(self, key: Any | None = None) -> None:
+        if key is None:
+            self._store.clear()
+        else:
+            self._store.pop(key, None)
+
+    @property
+    def size(self) -> int:
+        return len(self._store)
+
+
+def backoff(attempt: int, base: float = 0.5, max_delay: float = 10.0, jitter: float = 0.3) -> float:
+    """Экспоненциальный backoff с джиттером: base * 2^(attempt-1), ±jitter%."""
+    delay = min(base * (2 ** (attempt - 1)), max_delay)
+    return delay * (1 + random.uniform(-jitter, jitter))
+
+
+def async_retry(
+    retries: int = 3,
+    base: float = 0.5,
+    retry_on: tuple[type[Exception], ...] = (Exception,),
+):
+    """Декоратор для асинхронных функций: повторы с экспоненциальным backoff."""
+
+    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+        @functools.wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> T:
+            last: Exception | None = None
+            for attempt in range(1, retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except retry_on as exc:
+                    last = exc
+                    if attempt == retries:
+                        break
+                    await asyncio.sleep(backoff(attempt, base=base))
+            assert last is not None
+            raise last
+
+        return wrapper
+
+    return decorator
+
+======================================================================
 ФАЙЛ: project3_pdf_reports\.dockerignore
 ======================================================================
 .env
@@ -7752,6 +7800,11 @@ CMD ["python", "bot.py"]
 # PDF Sales Reports
 
 Генератор PDF-отчётов по продажам: выручка, маржинальность, топ-10 товаров таблицей, два графика. Поддерживает работу в двух режимах: **CLI-скрипт** (без Telegram) и **бот**.
+
+## 🕹 Живое демо
+
+Попробовать вживую: **[@dfs12f_bot](https://t.me/dfs12f_bot)** — демо-бот портфолио на общем токене.
+Локальный запуск — `run_bot3.cmd` (см. раздел «Запуск»). Примечание: в портфолио один токен на все боты, поэтому одновременно в сети может находиться только один проект.
 
 ## Запуск
 
@@ -9030,6 +9083,11 @@ CMD ["python", "bot.py"]
 
 Соответствует ТЗ: aiogram (обработка `PreCheckoutQuery` и `SuccessfulPayment`) + SQLite.
 
+## 🕹 Живое демо
+
+Попробовать вживую: **[@dfs12f_bot](https://t.me/dfs12f_bot)** — демо-бот портфолио на общем токене.
+Локальный запуск — `run_bot4.cmd` (см. раздел «Запуск»). Примечание: в портфолио один токен на все боты, поэтому одновременно в сети может находиться только один проект.
+
 ## Команды
 
 | Команда | Назначение |
@@ -9985,7 +10043,7 @@ CMD ["python", "bot.py"]
 
 ## Интеграционное тестирование
 
-Модульные тесты не покрывают полный конвейер обработки. Для этого написан `tests/test_live_flow.py`: **реальный Dispatcher** бота получает настоящие Telegram-апдейты (`/start → /quiz → выбор сложности → 10 ответов → /leaderboard → /stats`), а все исходящие вызовы Bot API перехватываются через `CapturingSession` — сеть не требуется, тест детерминирован. Отдельно проверены неверный ответ (отображается правильный) и устаревшая кнопка (отклоняется).
+Модульные тесты не покрывают полный конвейер обработки. Для этого написан `tests/test_live_flow.py`: **реальный Dispatcher** бота получает настоящие Telegram-апдейты (`/start → /quiz → выбор сложности → 10 ответов → /leaderboard → /stats`), а все исходящие вызовы Bot API перехватываются через `CapturingSession` — сеть не требуется, тест детерминирован. Отдельно проверены неверный ответ (отображается правильный), устаревшая кнопка прошлой игры и повторный клик по кнопке уже отвеченного вопроса (оба отклоняются).
 
 ## Запуск
 
@@ -10007,7 +10065,7 @@ quiz_api.py     — запросы к OpenTDB, оффлайн-пул, постр
 db.py           — SQLite: статистика, лидерборд, журнал игр
 middlewares.py  — троттлинг и логирование
 config.py       — настройки из переменных окружения
-tests/          — 10 тестов (7 unit + 3 интеграционных)
+tests/          — 12 тестов (8 unit + 4 интеграционных)
 ```
 
 ## Планы развития
@@ -10018,7 +10076,7 @@ tests/          — 10 тестов (7 unit + 3 интеграционных)
 
 ## Тесты
 
-`pytest tests/ -q` — 10 тестов. GitHub Actions прогоняет их при каждом push.
+`pytest tests/ -q` — 12 тестов. GitHub Actions прогоняет их при каждом push.
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\bot.py
@@ -10125,10 +10183,31 @@ def _difficulty_keyboard() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def _game_keyboard(question: Question, game_id: str) -> InlineKeyboardMarkup:
+def parse_answer_callback(data: str) -> tuple[int, str, int, int] | None:
+    """Разбирает 'quiz:{user_id}:{nonce}:{question_index}:{answer}'.
+
+    Индекс вопроса в callback-данных защищает от повторного клика по
+    кнопке уже отвеченного вопроса (иначе ответ засчитывался бы
+    следующему вопросу). None — мусорные/старые данные.
+    """
+    parts = data.split(":")
+    if (
+        len(parts) != 5
+        or not parts[1].isdigit()
+        or not parts[3].isdigit()
+        or not parts[4].isdigit()
+    ):
+        return None
+    return int(parts[1]), parts[2], int(parts[3]), int(parts[4])
+
+
+def _game_keyboard(question: Question, game_id: str, qindex: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for idx, option in enumerate(question.options):
-        kb.button(text=f"{idx + 1}. {option[:60]}", callback_data=f"quiz:{game_id}:{idx}")
+        kb.button(
+            text=f"{idx + 1}. {option[:60]}",
+            callback_data=f"quiz:{game_id}:{qindex}:{idx}",
+        )
     kb.adjust(1)
     return kb.as_markup()
 
@@ -10177,7 +10256,7 @@ async def _send_question(message: Message, user_id: int, game_id: str) -> None:
     q = game["questions"][game["index"]]
     await message.answer(
         _question_text(q, game["index"] + 1, len(game["questions"])),
-        reply_markup=_game_keyboard(q, game_id),
+        reply_markup=_game_keyboard(q, game_id, game["index"]),
     )
 
 
@@ -10228,16 +10307,22 @@ async def on_difficulty(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("quiz:"))
 async def on_answer(callback: CallbackQuery) -> None:
-    parts = callback.data.split(":")
-    # формат quiz:{user_id}:{nonce}:{idx}; мусорные данные игнорируем
-    if len(parts) != 4 or not parts[1].isdigit() or not parts[3].isdigit():
+    # формат quiz:{user_id}:{nonce}:{question_index}:{answer}
+    parsed = parse_answer_callback(callback.data or "")
+    if parsed is None:
         await callback.answer("Устаревшая кнопка.", show_alert=False)
         return
-    _, user_id_str, nonce, answer_idx = parts
+    cb_user_id, nonce, qindex, answer_idx = parsed
     user_id = callback.from_user.id
     game = _games.get(user_id)
-    # чужие кнопки и кнопки от ПРОШЛОЙ игры того же игрока — недействительны
-    if user_id_str != str(user_id) or game is None or nonce != game.get("nonce"):
+    # чужие кнопки, кнопки от ПРОШЛОЙ игры и повторный клик по уже
+    # отвеченному вопросу — недействительны
+    if (
+        cb_user_id != user_id
+        or game is None
+        or nonce != game.get("nonce")
+        or qindex != game["index"]
+    ):
         await callback.answer(
             "Эта кнопка устарела — начните новую игру: /quiz", show_alert=True
         )
@@ -10972,7 +11057,7 @@ def test_full_game_flow(tmp_path) -> None:
         for i in range(total):
             q = game["questions"][i]
             await dp.feed_update(
-                bot, _cb_update(f"quiz:{USER_ID}:{nonce}:{q.correct_index}",
+                bot, _cb_update(f"quiz:{USER_ID}:{nonce}:{i}:{q.correct_index}",
                                 mid := mid + 1, upd := upd + 1)
             )
 
@@ -11026,7 +11111,7 @@ def test_wrong_answer_shows_correct_option(tmp_path) -> None:
         q = game["questions"][0]
         wrong = (q.correct_index + 1) % len(q.options)
         await dp.feed_update(
-            bot, _cb_update(f"quiz:{USER_ID}:{game['nonce']}:{wrong}",
+            bot, _cb_update(f"quiz:{USER_ID}:{game['nonce']}:0:{wrong}",
                             mid := mid + 1, upd := upd + 1)
         )
 
@@ -11068,7 +11153,7 @@ def test_stale_button_from_previous_game_rejected(tmp_path) -> None:
         # жмём кнопку СТАРОЙ игры → отклоняется с предупреждением
         session.calls.clear()
         await dp.feed_update(
-            bot, _cb_update(f"quiz:{USER_ID}:{old_nonce}:0", mid := mid + 1, upd := upd + 1)
+            bot, _cb_update(f"quiz:{USER_ID}:{old_nonce}:0:0", mid := mid + 1, upd := upd + 1)
         )
         alerts = [
             c["data"] for c in session.calls
@@ -11079,9 +11164,50 @@ def test_stale_button_from_previous_game_rejected(tmp_path) -> None:
 
         # кнопка НОВОЙ игры работает
         await dp.feed_update(
-            bot, _cb_update(f"quiz:{USER_ID}:{new_nonce}:0", mid := mid + 1, upd := upd + 1)
+            bot, _cb_update(f"quiz:{USER_ID}:{new_nonce}:0:0", mid := mid + 1, upd := upd + 1)
         )
         assert len(_edit_texts(session)) == 1
+        await bot.session.close()
+
+    asyncio.run(run())
+
+
+def test_double_click_same_button_ignored(tmp_path) -> None:
+    """Повторный клик по кнопке уже отвеченного вопроса не засчитывается."""
+    db_path = str(tmp_path / "quiz.db")
+
+    async def run() -> None:
+        _reset_state(db_path)
+        await botmod.db.init()
+        session = CapturingSession()
+        bot = _make_bot(session)
+        dp = DP
+
+        upd = mid = 0
+        await dp.feed_update(bot, _msg_update("/quiz", mid := mid + 1, upd := upd + 1))
+        await dp.feed_update(bot, _cb_update("diff:any", mid := mid + 1, upd := upd + 1))
+
+        game = botmod._games[USER_ID]
+        q = game["questions"][0]
+        cb = f"quiz:{USER_ID}:{game['nonce']}:0:{q.correct_index}"
+
+        # первый клик — ответ засчитан, индекс игры сдвинулся
+        await dp.feed_update(bot, _cb_update(cb, mid := mid + 1, upd := upd + 1))
+        assert botmod._games[USER_ID]["index"] == 1
+        assert botmod._games[USER_ID]["score"] == 1
+        edits = _edit_texts(session)
+        assert edits and "✅ Верно!" in edits[-1]
+
+        # тот же callback повторно — отклоняется, состояние не меняется
+        session.calls.clear()
+        await dp.feed_update(bot, _cb_update(cb, mid := mid + 1, upd := upd + 1))
+        alerts = [
+            c["data"] for c in session.calls
+            if c["method"] == "AnswerCallbackQuery" and c["data"].get("show_alert")
+        ]
+        assert alerts and "устарела" in alerts[0]["text"]
+        assert botmod._games[USER_ID]["index"] == 1   # вопрос не перескочил
+        assert botmod._games[USER_ID]["score"] == 1   # очко не задвоилось
         await bot.session.close()
 
     asyncio.run(run())
@@ -11194,6 +11320,19 @@ def test_leaderboard_and_full_stats(tmp_path) -> None:
         assert await db.full_stats(999) is None
 
     asyncio.run(run())
+
+
+def test_parse_answer_callback() -> None:
+    from bot import parse_answer_callback
+
+    assert parse_answer_callback("quiz:123:abcd1234:0:2") == (123, "abcd1234", 0, 2)
+    assert parse_answer_callback("quiz:123:abcd1234:3:1") == (123, "abcd1234", 3, 1)
+    # старый формат без индекса вопроса — мусорные данные
+    assert parse_answer_callback("quiz:123:abcd1234:2") is None
+    assert parse_answer_callback("quiz:abc:abcd1234:0:2") is None   # id не число
+    assert parse_answer_callback("quiz:123:abcd1234:x:2") is None   # индекс не число
+    assert parse_answer_callback("quiz:123:abcd1234:0:y") is None   # ответ не число
+    assert parse_answer_callback("junk") is None
 
 
 def test_paginate_helper() -> None:
@@ -11336,7 +11475,7 @@ alerts.py       — логика пороговых алертов (однора
 db.py           — aiosqlite: история, подписки, watchlist, алерты
 middlewares.py  — троттлинг и логирование
 config.py       — настройки из переменных окружения
-tests/          — 8 тестов (парсинг XML, кодировка, номинал, алерты, история, подписки)
+tests/          — 9 тестов (парсинг XML, кодировка, номинал, конвертация, алерты, история, подписки)
 ```
 
 ## Планы развития
@@ -11347,7 +11486,7 @@ tests/          — 8 тестов (парсинг XML, кодировка, но
 
 ## Тесты
 
-`pytest tests/ -q` — 8 тестов. GitHub Actions прогоняет их при каждом push.
+`pytest tests/ -q` — 9 тестов. GitHub Actions прогоняет их при каждом push.
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\alerts.py
@@ -11418,7 +11557,8 @@ def evaluate_alerts(rates: dict[str, Rate], alerts: list[dict]) -> list[dict]:
 Команды:
   /rates          — курсы моих валют (watchlist) или основных
   /rate USD       — курс одной валюты
-  /convert 100 USD— перевод валюты в рубли
+  /convert 100 USD — перевод валюты в рубли
+  /convert 100 USD EUR — перевод между валютами
   /history USD    — курс за последние 7 дней (из SQLite)
   /daily on|off   — подписка на ежедневную рассылку
   /watch USD EUR  — добавить валюты в мой список
@@ -11550,6 +11690,7 @@ async def cmd_start(message: Message) -> None:
         "/rates — курсы моих валют\n"
         "/rate USD — курс одной валюты\n"
         "/convert 100 USD — перевод в рубли\n"
+        "/convert 100 USD EUR — перевод между валютами\n"
         "/history USD — курс за 7 дней\n"
         "/watch USD EUR — добавить валюты в список\n"
         "/watchlist — мой список валют\n"
@@ -11605,32 +11746,43 @@ async def cmd_rate(message: Message) -> None:
 @router.message(Command("convert"))
 async def cmd_convert(message: Message) -> None:
     args = message.text.split()
-    if len(args) < 3:
-        await message.answer("Использование: /convert 100 USD")
+    if len(args) not in (3, 4):
+        await message.answer(
+            "Использование: /convert 100 USD  (в рубли)\n"
+            "/convert 100 USD EUR  (между двумя валютами)"
+        )
         return
     try:
         amount = float(args[1].replace(",", "."))
     except ValueError:
         await message.answer("Сумма должна быть числом: /convert 100 USD")
         return
-    code = args[2].upper()
+    code_from = args[2].upper()
+    code_to = args[3].upper() if len(args) == 4 else "RUB"
     if amount <= 0:
         await message.answer("Сумма должна быть больше нуля.")
         return
     try:
-        rub = await cbr.convert(code, amount)
+        if code_to == "RUB":
+            result = await cbr.convert(code_from, amount)
+            suffix = "₽"
+        else:
+            result = await cbr.convert_between(code_from, code_to, amount)
+            suffix = _html.escape(code_to)
     except Exception:
-        logger.exception("Не удалось сконвертировать %s", code)
+        logger.exception("Не удалось сконвертировать %s → %s", code_from, code_to)
         await message.answer("⚠️ Не удалось получить курс. Попробуйте позже.")
         return
-    if rub is None:
+    if result is None:
         await message.answer(
-            f"Валюта <b>{_html.escape(code)}</b> не найдена. Пример: /convert 100 USD"
+            f"Валюта <b>{_html.escape(code_from)}</b> или "
+            f"<b>{_html.escape(code_to)}</b> не найдена. "
+            "Пример: /convert 100 USD EUR"
         )
         return
     await message.answer(
-        f"💱 {_money(amount)} {_html.escape(code)} = "
-        f"<b>{_money(rub)} ₽</b>"
+        f"💱 {_money(amount)} {_html.escape(code_from)} = "
+        f"<b>{_money(result)} {suffix}</b>"
     )
 
 
@@ -11917,6 +12069,17 @@ class CbrClient:
         if rate is None:
             return None
         return amount * rate.value / rate.nominal
+
+    async def convert_between(
+        self, code_from: str, code_to: str, amount: float
+    ) -> float | None:
+        """amount единиц code_from → code_to (или None, если валюта не найдена)."""
+        rates = await self.fetch_rates()
+        src = rates.get(code_from.upper())
+        dst = rates.get(code_to.upper())
+        if src is None or dst is None:
+            return None
+        return amount * src.per_one / dst.per_one
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\config.py
@@ -12311,6 +12474,32 @@ def test_demo_mode_rates() -> None:
     asyncio.run(run())
 
 
+def test_convert_between() -> None:
+    """100 USD → EUR: 100 * (91.2345 / 1) / (99.4567 / 1) ≈ 91.73."""
+    async def run() -> None:
+        import httpx
+
+        class FakeTransport(httpx.AsyncBaseTransport):
+            async def handle_async_request(self, request):
+                return httpx.Response(
+                    200, content=SAMPLE_XML.encode("cp1251"), request=request
+                )
+
+        client = CbrClient(demo_mode=False)
+        client._transport = FakeTransport()
+        got = await client.convert_between("USD", "EUR", 100)
+        assert got is not None
+        assert round(got, 2) == round(100 * 91.2345 / 99.4567, 2)
+        # обратное направление — реципрокное значение
+        back = await client.convert_between("EUR", "USD", got)
+        assert round(back, 2) == 100.0
+        # валюты не существует — None
+        assert await client.convert_between("USD", "XXX", 100) is None
+        assert await client.convert_between("XXX", "USD", 100) is None
+
+    asyncio.run(run())
+
+
 def test_convert_math() -> None:
     # 100 USD = 100 * (91.2345 / 1) рублей
     async def run() -> None:
@@ -12536,7 +12725,7 @@ db.py           — aiosqlite: город по умолчанию, подпис�
 utils.py        — TTL-кэш и retry с джиттером на чистом stdlib
 middlewares.py  — троттлинг и логирование
 config.py       — настройки из переменных окружения
-tests/          — 7 тестов (парсинг текущей погоды, прогноза, кэш, подписки)
+tests/          — 8 тестов (парсинг текущей погоды, прогноза, метки дней, кэш, подписки)
 ```
 
 ## Планы развития
@@ -12547,7 +12736,7 @@ tests/          — 7 тестов (парсинг текущей погоды, 
 
 ## Тесты
 
-`pytest tests/ -q` — 7 тестов. GitHub Actions прогоняет их при каждом push.
+`pytest tests/ -q` — 8 тестов. GitHub Actions прогоняет их при каждом push.
 
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\bot.py
@@ -12577,6 +12766,7 @@ import asyncio
 import html as _html
 import logging
 import os
+from datetime import date
 
 from aiogram import Bot, Dispatcher, Router
 from aiogram.client.default import DefaultBotProperties
@@ -12635,9 +12825,26 @@ def _format_current(name: str, weather) -> str:
     )
 
 
+_WEEKDAYS = ("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")
+
+
+def _day_label(date_str: str) -> str:
+    """'2026-08-07' → 'Сегодня' для сегодняшнего дня, иначе 'Пт, 07.08'.
+
+    Если дата не разбирается (демо-режим: 'day+0') — возвращаем как есть.
+    """
+    if date_str == date.today().isoformat():
+        return "Сегодня"
+    try:
+        day = date.fromisoformat(date_str)
+    except ValueError:
+        return date_str
+    return f"{_WEEKDAYS[day.weekday()]}, {day.strftime('%d.%m')}"
+
+
 def _format_forecast(name: str, days) -> str:
     lines = [f"📅 <b>Прогноз для {_html.escape(name)} на {len(days)} дней</b>\n"]
-    lines += [f"• {d.describe()}" for d in days]
+    lines += [f"• {d.describe(_day_label(d.date))}" for d in days]
     return "\n".join(lines)
 
 
@@ -13009,6 +13216,151 @@ set "PYTHONIOENCODING=utf-8"
 ..\.venv\Scripts\python.exe -u bot.py
 
 ======================================================================
+ФАЙЛ: project7_telegram_weather_bot\tests\conftest.py
+======================================================================
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+======================================================================
+ФАЙЛ: project7_telegram_weather_bot\tests\test_weather.py
+======================================================================
+"""Unit-тесты Weather Bot: парсинг Open-Meteo, WMO, демо-режим, БД."""
+import asyncio
+
+import httpx
+
+from db import Database
+from weather_api import (
+    Geocoder,
+    WeatherClient,
+    _parse_current,
+    _parse_forecast,
+    _parse_geocode,
+    wmo,
+)
+
+GEO_PAYLOAD = {
+    "results": [
+        {"name": "Москва", "latitude": 55.75, "longitude": 37.62, "country": "Россия"}
+    ]
+}
+
+FORECAST_PAYLOAD = {
+    "current": {
+        "time": "2026-08-07T12:00",
+        "temperature_2m": 21.3,
+        "relative_humidity_2m": 64.0,
+        "wind_speed_10m": 7.5,
+        "weather_code": 3,
+    },
+    "daily": {
+        "time": ["2026-08-07", "2026-08-08"],
+        "weather_code": [3, 61],
+        "temperature_2m_max": [24.1, 19.4],
+        "temperature_2m_min": [15.2, 12.0],
+        "precipitation_probability_max": [10, 80],
+    },
+}
+
+
+class FakeTransport(httpx.AsyncBaseTransport):
+    def __init__(self, payload: dict) -> None:
+        self.payload = payload
+
+    async def handle_async_request(self, request):
+        return httpx.Response(200, json=self.payload, request=request)
+
+
+def test_day_label() -> None:
+    from datetime import date
+
+    from bot import _day_label
+
+    assert _day_label(date.today().isoformat()) == "Сегодня"
+    assert _day_label("2026-08-07") == "Пт, 07.08"   # 7 августа 2026 — пятница
+    assert _day_label("2026-08-08") == "Сб, 08.08"
+    assert _day_label("day+0") == "day+0"           # демо-режим — как есть
+    assert _day_label("мусор") == "мусор"
+
+
+def test_wmo_map() -> None:
+    assert wmo(0) == ("Ясно", "☀️")
+    assert wmo(95) == ("Гроза", "⛈")
+    assert wmo(999)[0] == "Неизвестно"  # неизвестный код не падает
+
+
+def test_parse_geocode() -> None:
+    point = _parse_geocode(GEO_PAYLOAD)
+    assert point is not None
+    assert point.name == "Москва"
+    assert point.latitude == 55.75
+    assert point.longitude == 37.62
+    assert _parse_geocode({"results": []}) is None
+    assert _parse_geocode({}) is None
+
+
+def test_parse_current() -> None:
+    cur = _parse_current(FORECAST_PAYLOAD)
+    assert cur.temperature == 21.3
+    assert cur.humidity == 64.0
+    assert cur.wind_speed == 7.5
+    assert cur.code == 3
+    assert "Пасмурно" in cur.describe()
+
+
+def test_parse_forecast() -> None:
+    days = _parse_forecast(FORECAST_PAYLOAD)
+    assert len(days) == 2
+    assert days[0].date == "2026-08-07"
+    assert days[0].t_max == 24.1
+    assert days[1].precip_prob == 80.0
+    assert "2026-08-08" in days[1].describe()
+
+
+def test_demo_mode_geocoder_and_weather() -> None:
+    async def run() -> None:
+        point = await Geocoder(demo_mode=True).geocode("казань")
+        assert point is not None and point.name == "Казань"
+        client = WeatherClient(demo_mode=True)
+        cur = await client.current(55.0, 49.0)
+        assert -40 <= cur.temperature <= 40
+        days = await client.forecast(55.0, 49.0, days=7)
+        assert len(days) == 7
+
+    asyncio.run(run())
+
+
+def test_real_client_with_fake_transport() -> None:
+    """Реальный клиент с подменой транспорта (без сети) парсит ответ Open-Meteo."""
+    async def run() -> None:
+        client = WeatherClient(demo_mode=False, transport=FakeTransport(FORECAST_PAYLOAD))
+        cur = await client.current(55.75, 37.62)
+        assert cur.temperature == 21.3
+        days = await client.forecast(55.75, 37.62, days=2)
+        assert len(days) == 2
+
+    asyncio.run(run())
+
+
+def test_db_city_and_digest(tmp_path) -> None:
+    async def run() -> None:
+        db = Database(str(tmp_path / "weather.db"))
+        await db.init()
+        await db.set_city(1, "alice", "Москва", 55.75, 37.62)
+        user = await db.get_user(1)
+        assert user["city"] == "Москва" and user["daily_digest"] == 0
+        assert await db.get_user(999) is None
+
+        await db.set_digest(1, "alice", True)
+        await db.set_digest(2, "bob", True)  # без города — не попадёт в рассылку
+        digest = await db.digest_users()
+        assert [u["user_id"] for u in digest] == [1]
+
+    asyncio.run(run())
+
+======================================================================
 ФАЙЛ: project7_telegram_weather_bot\utils.py
 ======================================================================
 """Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером."""
@@ -13163,10 +13515,11 @@ class DayForecast(BaseModel):
     t_min: float
     precip_prob: float = 0.0
 
-    def describe(self) -> str:
+    def describe(self, label: str | None = None) -> str:
         desc, emoji = wmo(self.code)
+        prefix = label or self.date
         return (
-            f"{self.date}: {emoji} {desc}, "
+            f"{prefix}: {emoji} {desc}, "
             f"{self.t_min:.0f}…{self.t_max:.0f}°C, осадки {self.precip_prob:.0f}%"
         )
 
@@ -13297,139 +13650,6 @@ class WeatherClient:
             resp = await client.get(config.FORECAST_URL, params=params)
             resp.raise_for_status()
             return resp.json()
-
-======================================================================
-ФАЙЛ: project7_telegram_weather_bot\tests\conftest.py
-======================================================================
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-======================================================================
-ФАЙЛ: project7_telegram_weather_bot\tests\test_weather.py
-======================================================================
-"""Unit-тесты Weather Bot: парсинг Open-Meteo, WMO, демо-режим, БД."""
-import asyncio
-
-import httpx
-
-from db import Database
-from weather_api import (
-    Geocoder,
-    WeatherClient,
-    _parse_current,
-    _parse_forecast,
-    _parse_geocode,
-    wmo,
-)
-
-GEO_PAYLOAD = {
-    "results": [
-        {"name": "Москва", "latitude": 55.75, "longitude": 37.62, "country": "Россия"}
-    ]
-}
-
-FORECAST_PAYLOAD = {
-    "current": {
-        "time": "2026-08-07T12:00",
-        "temperature_2m": 21.3,
-        "relative_humidity_2m": 64.0,
-        "wind_speed_10m": 7.5,
-        "weather_code": 3,
-    },
-    "daily": {
-        "time": ["2026-08-07", "2026-08-08"],
-        "weather_code": [3, 61],
-        "temperature_2m_max": [24.1, 19.4],
-        "temperature_2m_min": [15.2, 12.0],
-        "precipitation_probability_max": [10, 80],
-    },
-}
-
-
-class FakeTransport(httpx.AsyncBaseTransport):
-    def __init__(self, payload: dict) -> None:
-        self.payload = payload
-
-    async def handle_async_request(self, request):
-        return httpx.Response(200, json=self.payload, request=request)
-
-
-def test_wmo_map() -> None:
-    assert wmo(0) == ("Ясно", "☀️")
-    assert wmo(95) == ("Гроза", "⛈")
-    assert wmo(999)[0] == "Неизвестно"  # неизвестный код не падает
-
-
-def test_parse_geocode() -> None:
-    point = _parse_geocode(GEO_PAYLOAD)
-    assert point is not None
-    assert point.name == "Москва"
-    assert point.latitude == 55.75
-    assert point.longitude == 37.62
-    assert _parse_geocode({"results": []}) is None
-    assert _parse_geocode({}) is None
-
-
-def test_parse_current() -> None:
-    cur = _parse_current(FORECAST_PAYLOAD)
-    assert cur.temperature == 21.3
-    assert cur.humidity == 64.0
-    assert cur.wind_speed == 7.5
-    assert cur.code == 3
-    assert "Пасмурно" in cur.describe()
-
-
-def test_parse_forecast() -> None:
-    days = _parse_forecast(FORECAST_PAYLOAD)
-    assert len(days) == 2
-    assert days[0].date == "2026-08-07"
-    assert days[0].t_max == 24.1
-    assert days[1].precip_prob == 80.0
-    assert "2026-08-08" in days[1].describe()
-
-
-def test_demo_mode_geocoder_and_weather() -> None:
-    async def run() -> None:
-        point = await Geocoder(demo_mode=True).geocode("казань")
-        assert point is not None and point.name == "Казань"
-        client = WeatherClient(demo_mode=True)
-        cur = await client.current(55.0, 49.0)
-        assert -40 <= cur.temperature <= 40
-        days = await client.forecast(55.0, 49.0, days=7)
-        assert len(days) == 7
-
-    asyncio.run(run())
-
-
-def test_real_client_with_fake_transport() -> None:
-    """Реальный клиент с подменой транспорта (без сети) парсит ответ Open-Meteo."""
-    async def run() -> None:
-        client = WeatherClient(demo_mode=False, transport=FakeTransport(FORECAST_PAYLOAD))
-        cur = await client.current(55.75, 37.62)
-        assert cur.temperature == 21.3
-        days = await client.forecast(55.75, 37.62, days=2)
-        assert len(days) == 2
-
-    asyncio.run(run())
-
-
-def test_db_city_and_digest(tmp_path) -> None:
-    async def run() -> None:
-        db = Database(str(tmp_path / "weather.db"))
-        await db.init()
-        await db.set_city(1, "alice", "Москва", 55.75, 37.62)
-        user = await db.get_user(1)
-        assert user["city"] == "Москва" and user["daily_digest"] == 0
-        assert await db.get_user(999) is None
-
-        await db.set_digest(1, "alice", True)
-        await db.set_digest(2, "bob", True)  # без города — не попадёт в рассылку
-        digest = await db.digest_users()
-        assert [u["user_id"] for u in digest] == [1]
-
-    asyncio.run(run())
 
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\.dockerignore
@@ -14903,92 +15123,6 @@ set "PYTHONIOENCODING=utf-8"
 ..\.venv\Scripts\python.exe -u bot.py
 
 ======================================================================
-ФАЙЛ: project9_telegram_news_bot\utils.py
-======================================================================
-"""Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером."""
-from __future__ import annotations
-
-import asyncio
-import functools
-import logging
-import random
-import time
-from typing import Any, Awaitable, Callable, TypeVar
-
-logger = logging.getLogger(__name__)
-
-T = TypeVar("T")
-
-
-class TTLCache:
-    """TTL-кэш: значение живёт ttl секунд после записи."""
-
-    def __init__(self, ttl_seconds: float = 600.0) -> None:
-        self._ttl = ttl_seconds
-        self._store: dict[Any, tuple[float, Any]] = {}
-
-    def get(self, key: Any) -> Any | None:
-        item = self._store.get(key)
-        if item is None:
-            return None
-        expires, value = item
-        if time.monotonic() > expires:
-            self._store.pop(key, None)
-            return None
-        return value
-
-    async def get_or_set(self, key: Any, factory: Callable[[], Awaitable[T]]) -> T:
-        cached = self.get(key)
-        if cached is not None:
-            return cached
-        value = await factory()
-        self._store[key] = (time.monotonic() + self._ttl, value)
-        return value
-
-    def invalidate(self, key: Any | None = None) -> None:
-        if key is None:
-            self._store.clear()
-        else:
-            self._store.pop(key, None)
-
-    @property
-    def size(self) -> int:
-        return len(self._store)
-
-
-def backoff(attempt: int, base: float = 0.5, max_delay: float = 10.0, jitter: float = 0.3) -> float:
-    """Экспоненциальный backoff с джиттером: base * 2^(attempt-1), ±jitter%."""
-    delay = min(base * (2 ** (attempt - 1)), max_delay)
-    return delay * (1 + random.uniform(-jitter, jitter))
-
-
-def async_retry(
-    retries: int = 3,
-    base: float = 0.5,
-    retry_on: tuple[type[Exception], ...] = (Exception,),
-):
-    """Декоратор для асинхронных функций: повторы с экспоненциальным backoff."""
-
-    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> T:
-            last: Exception | None = None
-            for attempt in range(1, retries + 1):
-                try:
-                    return await func(*args, **kwargs)
-                except retry_on as exc:
-                    last = exc
-                    if attempt == retries:
-                        break
-                    await asyncio.sleep(backoff(attempt, base=base))
-            assert last is not None
-            raise last
-
-        return wrapper
-
-    return decorator
-
-======================================================================
 ФАЙЛ: project9_telegram_news_bot\tests\test_rss.py
 ======================================================================
 """Тесты News Bot: парсинг RSS/Atom, дедупликация, подписки."""
@@ -15089,4 +15223,90 @@ def test_db_dedup_and_subscriptions(tmp_path):
         assert await db.all_subscriptions() == []
 
     asyncio.run(run())
+
+======================================================================
+ФАЙЛ: project9_telegram_news_bot\utils.py
+======================================================================
+"""Продвинутые утилиты на чистом stdlib: TTL-кэш и retry с джиттером."""
+from __future__ import annotations
+
+import asyncio
+import functools
+import logging
+import random
+import time
+from typing import Any, Awaitable, Callable, TypeVar
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+class TTLCache:
+    """TTL-кэш: значение живёт ttl секунд после записи."""
+
+    def __init__(self, ttl_seconds: float = 600.0) -> None:
+        self._ttl = ttl_seconds
+        self._store: dict[Any, tuple[float, Any]] = {}
+
+    def get(self, key: Any) -> Any | None:
+        item = self._store.get(key)
+        if item is None:
+            return None
+        expires, value = item
+        if time.monotonic() > expires:
+            self._store.pop(key, None)
+            return None
+        return value
+
+    async def get_or_set(self, key: Any, factory: Callable[[], Awaitable[T]]) -> T:
+        cached = self.get(key)
+        if cached is not None:
+            return cached
+        value = await factory()
+        self._store[key] = (time.monotonic() + self._ttl, value)
+        return value
+
+    def invalidate(self, key: Any | None = None) -> None:
+        if key is None:
+            self._store.clear()
+        else:
+            self._store.pop(key, None)
+
+    @property
+    def size(self) -> int:
+        return len(self._store)
+
+
+def backoff(attempt: int, base: float = 0.5, max_delay: float = 10.0, jitter: float = 0.3) -> float:
+    """Экспоненциальный backoff с джиттером: base * 2^(attempt-1), ±jitter%."""
+    delay = min(base * (2 ** (attempt - 1)), max_delay)
+    return delay * (1 + random.uniform(-jitter, jitter))
+
+
+def async_retry(
+    retries: int = 3,
+    base: float = 0.5,
+    retry_on: tuple[type[Exception], ...] = (Exception,),
+):
+    """Декоратор для асинхронных функций: повторы с экспоненциальным backoff."""
+
+    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+        @functools.wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> T:
+            last: Exception | None = None
+            for attempt in range(1, retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except retry_on as exc:
+                    last = exc
+                    if attempt == retries:
+                        break
+                    await asyncio.sleep(backoff(attempt, base=base))
+            assert last is not None
+            raise last
+
+        return wrapper
+
+    return decorator
 
