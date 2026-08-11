@@ -1,4 +1,4 @@
-СВОДНЫЙ ДАМП КОДА УЧЕБНЫХ ПРОЕКТОВ — 187 файлов
+СВОДНЫЙ ДАМП КОДА УЧЕБНЫХ ПРОЕКТОВ — 189 файлов
 
 ======================================================================
 ФАЙЛ: .gitignore
@@ -7655,6 +7655,37 @@ def mock_reviews(n: int = config.MAX_REVIEWS) -> list[dict]:
 
 
 ======================================================================
+ФАЙЛ: project2_ai_review_analyst\run_bot2.cmd
+======================================================================
+@echo off
+rem Launch script for AI Review Analyst (Project 2).
+rem Reads TG_TOKEN from the root .env, sets WB_BOT_TOKEN, runs the bot in demo mode.
+cd /d "%~dp0"
+
+for /f "usebackq tokens=1,* delims==" %%a in ("..\.env") do (
+    if "%%a"=="TG_TOKEN" set "WB_BOT_TOKEN=%%b"
+)
+if not defined WB_BOT_TOKEN (
+    echo [ERROR] TG_TOKEN not found in ..\.env
+    pause
+    exit /b 1
+)
+
+rem 1 = demo mode: mock reviews + mock LLM (no network, no keys) | 0 = real parsing + real LLM
+set "WB_DEMO_MODE=1"
+set "LLM_PROVIDER=mock"
+set "PYTHONIOENCODING=utf-8"
+
+rem --- REAL ANALYSIS: set keys, choose a provider, then switch off demo ---
+rem 1) set "WB_DEMO_MODE=0"
+rem 2) YandexGPT:  set "LLM_PROVIDER=yandex"  + YANDEX_FOLDER_ID / YANDEX_API_KEY
+rem    OpenAI:     set "LLM_PROVIDER=openai"  + OPENAI_API_KEY
+rem 3) restart this script. Fallback providers are set via LLM_FALLBACKS (default: mock).
+
+..\.venv\Scripts\python.exe -u bot.py
+
+
+======================================================================
 ФАЙЛ: project2_ai_review_analyst\tests\conftest.py
 ======================================================================
 """Делает модули проекта импортируемыми для pytest."""
@@ -10162,6 +10193,35 @@ addopts = "-q"
 ======================================================================
 aiogram>=3.4,<4
 aiosqlite>=0.20
+
+
+======================================================================
+ФАЙЛ: project4_payment_gateway\run_bot4.cmd
+======================================================================
+@echo off
+rem Launch script for the Telegram Stars Payment Gateway (Project 4).
+rem Reads TG_TOKEN from the root .env, sets WB_BOT_TOKEN, runs the bot.
+cd /d "%~dp0"
+
+for /f "usebackq tokens=1,* delims==" %%a in ("..\.env") do (
+    if "%%a"=="TG_TOKEN" set "WB_BOT_TOKEN=%%b"
+)
+if not defined WB_BOT_TOKEN (
+    echo [ERROR] TG_TOKEN not found in ..\.env
+    pause
+    exit /b 1
+)
+
+rem 1 = Telegram Stars (empty provider_token, currency XTR) | 0 = YooKassa test mode
+set "STAR_PAYMENTS=1"
+set "PYTHONIOENCODING=utf-8"
+
+rem --- YOOKASSA TEST MODE: ---
+rem 1) set "STAR_PAYMENTS=0"
+rem 2) set "YOOKASSA_PROVIDER_TOKEN=<test token from @BotFather, Payments menu>"
+rem 3) restart this script.
+
+..\.venv\Scripts\python.exe -u bot.py
 
 
 ======================================================================
