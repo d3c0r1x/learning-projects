@@ -1,4 +1,4 @@
-СВОДНЫЙ ДАМП КОДА УЧЕБНЫХ ПРОЕКТОВ — 189 файлов
+СВОДНЫЙ ДАМП КОДА УЧЕБНЫХ ПРОЕКТОВ — 190 файлов
 
 ======================================================================
 ФАЙЛ: .gitignore
@@ -78,7 +78,7 @@ Desktop.ini
 - **тесты и CI** — `pytest` + `compileall` при каждом push в каждом репозитории;
 - **Dockerfile и pyproject.toml** — возможность запуска в любом окружении.
 
-Итого **126 unit-тестов** (10+9+9+5+12+9+9+9+7+19+28) + изолированный валидатор. В Проектах 5, 10 и 11 — интеграционные тесты полных игровых/рабочих сценариев через настоящий Dispatcher с перехватом исходящих вызовов Bot API. В каждом README — раздел «Технические особенности» с описанием выявленных ограничений и решений, а также «Планы развития».
+Итого **130 unit-тестов** (12+9+9+7+12+9+8+9+7+19+29) + изолированный валидатор. В Проектах 5, 10 и 11 — интеграционные тесты полных игровых/рабочих сценариев через настоящий Dispatcher с перехватом исходящих вызовов Bot API. В каждом README — раздел «Технические особенности» с описанием выявленных ограничений и решений, а также «Планы развития».
 
 ## Примечания о публичных API (проверено 2026-08-05/08)
 
@@ -2783,6 +2783,7 @@ Telegram-бот для сравнения цен на одни и те же то
 | `/watch ЗАПРОС [ЦЕНА]` | Подписаться на запрос (необязательный порог) |
 | `/watches` | Список подписок |
 | `/unwatch ID` | Удалить подписку |
+| `/threshold ID ЦЕНА` | Изменить порог подписки |
 | `/history ID` | История лучшей цены по подписке |
 | `/diag` | Диагностика API |
 | `/stats` | Сводка по базе |
@@ -3481,6 +3482,7 @@ pydantic (модель товара).
   - /watch ЗАПРОС [ЦЕНА] — подписаться на запрос: бот периодически ищет
     заново и уведомляет, если лучшая цена упала или достигла порога;
   - /watches — список подписок; /unwatch ID — удалить подписку;
+  - /threshold ID ЦЕНА — изменить порог подписки;
   - /history ID — история лучших цен по подписке;
   - /diag — диагностика доступа к API; /stats — сводка по базе;
   - /cleanup ДНИ — очистка истории старше N дней (админ).
@@ -3578,6 +3580,7 @@ async def cmd_start(message: Message) -> None:
         "• /watch <b>ЗАПРОС [ЦЕНА]</b> — следить за запросом, уведомить при падении цены\n"
         "• /watches — мои подписки\n"
         "• /unwatch <b>ID</b> — удалить подписку\n"
+        "• /threshold <b>ID ЦЕНА</b> — изменить порог подписки\n"
         "• /history <b>ID</b> — история лучших цен по подписке\n"
         "• /diag — диагностика доступа к API\n"
         "• /stats — сводка по базе\n"
@@ -3678,6 +3681,24 @@ async def cmd_unwatch(message: Message) -> None:
         await message.answer(f"Подписка #{parts[1]} не найдена.")
 
 
+@router.message(Command("threshold"))
+async def cmd_threshold(message: Message) -> None:
+    """Меняет порог уведомлений существующей подписки (без пересоздания)."""
+    parts = (message.text or "").split()
+    if len(parts) != 3 or not parts[1].isdigit() or not parts[2].isdigit():
+        await message.answer("Формат: /threshold ID ЦЕНА (например, /threshold 1 2500)")
+        return
+    watch = await db.get_watch(int(parts[1]))
+    if watch is None or watch["user_id"] != message.from_user.id:
+        await message.answer("Подписка не найдена.")
+        return
+    await db.set_threshold(watch["id"], int(parts[2]))
+    await message.answer(
+        f"✅ Порог подписки #{watch['id']} «{_html.escape(watch['query'][:40], quote=False)}» "
+        f"теперь <b>{int(parts[2])} ₽</b>."
+    )
+
+
 @router.message(Command("history"))
 async def cmd_history(message: Message) -> None:
     parts = (message.text or "").split()
@@ -3733,6 +3754,9 @@ async def cmd_cleanup(message: Message) -> None:
         return
     parts = (message.text or "").split()
     days = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else config.HISTORY_KEEP_DAYS
+    if days < 1:
+        await message.answer("Дни должны быть больше нуля.")
+        return
     deleted = await db.cleanup_history(days)
     await message.answer(f"🧹 Удалено записей истории старше {days} дн.: {deleted}.")
 
@@ -4978,6 +5002,55 @@ def test_search_and_watch_escape_special_chars(tmp_path) -> None:
     asyncio.run(run())
 
 
+
+def test_threshold_and_cleanup_guard(tmp_path) -> None:
+    """/threshold меняет порог подписки; /cleanup 0 отклоняется (guard)."""
+    db_path = str(tmp_path / "cmp.db")
+
+    async def run() -> None:
+        _reset_state(db_path)
+        await botmod.db.init()
+        session = CapturingSession()
+        bot = _make_bot(session)
+        dp = DP
+
+        upd = mid = 0
+        # создаём подписку с порогом 3000
+        await dp.feed_update(bot, _msg_update("/watch наушники 3000", mid := mid + 1, upd := upd + 1))
+        assert any("Подписка #1" in t for t in _send_texts(session))
+        assert (await botmod.db.get_watch(1))["threshold"] == 3000
+
+        # /threshold 1 2500 — порог изменён без пересоздания
+        session.calls.clear()
+        await dp.feed_update(bot, _msg_update("/threshold 1 2500", mid := mid + 1, upd := upd + 1))
+        texts = _send_texts(session)
+        assert any("Порог подписки #1" in t and "2500 ₽" in t for t in texts)
+        assert (await botmod.db.get_watch(1))["threshold"] == 2500
+
+        # /threshold 1 — неверный формат
+        session.calls.clear()
+        await dp.feed_update(bot, _msg_update("/threshold 1", mid := mid + 1, upd := upd + 1))
+        assert any("Формат: /threshold ID ЦЕНА" in t for t in _send_texts(session))
+
+        # /threshold 999 100 — чужой/несуществующий ID
+        session.calls.clear()
+        await dp.feed_update(bot, _msg_update("/threshold 999 100", mid := mid + 1, upd := upd + 1))
+        assert any("Подписка не найдена" in t for t in _send_texts(session))
+
+        # /cleanup 0 — guard: дни должны быть больше нуля
+        session.calls.clear()
+        await dp.feed_update(bot, _msg_update("/cleanup 0", mid := mid + 1, upd := upd + 1))
+        assert any("Дни должны быть больше нуля" in t for t in _send_texts(session))
+        # /cleanup 30 — валидная очистка проходит
+        session.calls.clear()
+        await dp.feed_update(bot, _msg_update("/cleanup 30", mid := mid + 1, upd := upd + 1))
+        assert any("Удалено записей истории" in t for t in _send_texts(session))
+
+        await bot.session.close()
+
+    asyncio.run(run())
+
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\utils.py
 ======================================================================
@@ -5216,14 +5289,14 @@ db.py           — aiosqlite: товары, история цен, индекс
 middlewares.py  — троттлинг (защита от спама) и логирование
 config.py       — переменные окружения с дефолтами
 utils.py        — TTL-кэш карточек и retry с джиттером на чистом stdlib
-tests/          — 10 тестов (парсинг ответа WB, кулдаун, БД, извлечение артикула, fallback цены)
+tests/          — 12 тестов (парсинг ответа WB, кулдаун, БД, извлечение артикула, fallback цены, очистка карточек)
 ```
 
 ## Технические особенности
 
 1. **Ошибка 403 при стандартных запросах к WB.** Доступ определяется отпечатком TLS и протоколом HTTP/2. Решение — `curl_cffi` с имитацией Chrome.
 2. **Эмодзи в Windows-консоли** приводили к `UnicodeEncodeError` (кодировка cp1251). Решение — `PYTHONIOENCODING=utf-8`, зафиксировано в `run_bot1.cmd`.
-3. **Неограниченный рост базы данных** — каждая проверка создавала новые записи. Добавлен индекс на `(articul, checked_at)`, плановая очистка записей старше N дней и команда `/cleanup`.
+3. **Неограниченный рост базы данных** — каждая проверка создавала новые записи. Добавлен индекс на `(articul, checked_at)`, плановая очистка записей старше N дней, удаление карточек без подписок и команда `/cleanup`.
 
 ## Планы развития
 
@@ -5232,7 +5305,7 @@ tests/          — 10 тестов (парсинг ответа WB, кулда�
 
 ## Тесты
 
-`pytest tests/ -q` — 10 тестов. GitHub Actions прогоняет их (compileall + pytest) при каждом push.
+`pytest tests/ -q` — 12 тестов. GitHub Actions прогоняет их (compileall + pytest) при каждом push.
 
 
 ======================================================================
@@ -5591,6 +5664,8 @@ async def main() -> None:
         args=[bot],
         id="daily_check",
         replace_existing=True,
+        coalesce=True,
+        max_instances=1,  # не накладывать прогоны, если предыдущий ещё идёт
     )
     # Плановая очистка истории старше HISTORY_KEEP_DAYS дней (раз в сутки)
     scheduler.add_job(
@@ -5599,6 +5674,8 @@ async def main() -> None:
         hours=24,
         id="history_cleanup",
         replace_existing=True,
+        coalesce=True,
+        max_instances=1,
     )
     scheduler.start()
     logger.info(
@@ -5617,6 +5694,9 @@ async def _scheduled_cleanup() -> None:
     deleted = await db.cleanup_history(config.HISTORY_KEEP_DAYS)
     if deleted:
         logger.info("Плановая очистка истории: удалено %s записей", deleted)
+    orphans = await db.cleanup_orphans()
+    if orphans:
+        logger.info("Плановая очистка: удалено %s карточек без подписок", orphans)
 
 
 if __name__ == "__main__":
@@ -5863,6 +5943,20 @@ class Database:
         async with aiosqlite.connect(self.path) as db:
             cur = await db.execute(
                 "DELETE FROM price_history WHERE checked_at < ?", (cutoff,)
+            )
+            await db.commit()
+            return cur.rowcount
+
+    async def cleanup_orphans(self) -> int:
+        """Удаляет карточки товаров, за которыми никто не следит.
+
+        После /untrack карточка остаётся в items (история цен чистится отдельно
+        по возрасту) — без этой очистки таблица items росла бы бесконечно.
+        """
+        async with aiosqlite.connect(self.path) as db:
+            cur = await db.execute(
+                "DELETE FROM items WHERE articul NOT IN "
+                "(SELECT DISTINCT articul FROM tracked)"
             )
             await db.commit()
             return cur.rowcount
@@ -6252,6 +6346,58 @@ def test_prices_from_card_falls_back_when_sale_price_zero() -> None:
     assert (price, sale_price) == (1234, 1234)
 
 
+
+def test_cleanup_orphans(tmp_path) -> None:
+    """Карточки без подписок удаляются очисткой (таблица items не растёт)."""
+    async def run() -> None:
+        db = Database(str(tmp_path / "tracker.db"))
+        await db.init()
+        card = await MockWBClient().get_card(ARTICUL)
+        await db.upsert_item(card)
+        await db.track(111, str(ARTICUL))
+        assert (await db.stats())["items"] >= 1
+        await db.untrack(111, str(ARTICUL))
+        deleted = await db.cleanup_orphans()
+        assert deleted >= 1
+        assert (await db.stats())["items"] == 0
+
+    asyncio.run(run())
+
+
+class _FailingTransport:
+    """Всегда падает с сетевой ошибкой (обрыв соединения)."""
+
+    async def get(self, url, *, params=None, headers=None):
+        raise ConnectionError("network down")
+
+    async def aclose(self):
+        return None
+
+
+def test_retries_one_does_not_sleep_on_network_error(monkeypatch) -> None:
+    """С retries=1 (диагностика) сетевой ошибке не предшествует лишний sleep.
+
+    Раньше в _get сравнивался attempt с self._max_retries (3), а не с локальным
+    max_retries (1), поэтому перед raise делался sleep 0.5 c — теперь нет.
+    """
+    import wb_api
+
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds):
+        sleeps.append(seconds)
+
+    monkeypatch.setattr(wb_api.asyncio, "sleep", fake_sleep)
+    client = WBClient(transport=_FailingTransport(), max_retries=3)
+    try:
+        asyncio.run(client._get("https://card.wb.ru", retries=1))
+    except ConnectionError:
+        pass
+    else:
+        raise AssertionError("ожидалась сетевая ошибка")
+    assert sleeps == []  # один запрос без ретраев — сна быть не должно
+
+
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\utils.py
 ======================================================================
@@ -6541,7 +6687,7 @@ class WBClient:
                 )
             except Exception as exc:  # сетевая ошибка любого транспорта
                 last_exc = exc
-                if attempt == self._max_retries:
+                if attempt == max_retries:
                     raise
                 await asyncio.sleep(_backoff(attempt))
                 continue
@@ -14977,6 +15123,7 @@ CMD ["python", "bot.py"]
 | `/news [URL]` | свежие новости (по умолчанию Lenta.ru; свою ленту — по URL) |
 | `/sources` | встроенные ленты: Lenta, Habr, BBC World, Коммерсантъ |
 | `/digest on/off` | ежедневный дайджест в 9:00 |
+| `/mysubs` | на какие ленты включён дайджест |
 | `/latest` | последние сохранённые новости из базы |
 | `/stats` | количество обработанных новостей, число подписок |
 
@@ -15016,7 +15163,7 @@ db.py           — aiosqlite: статьи, дедупликация UNIQUE(lin
 utils.py        — TTL-кэш и retry с джиттером
 middlewares.py  — троттлинг и логирование
 config.py       — настройки из переменных окружения
-tests/          — 6 тестов (RSS, Atom с namespace, кодировка из байтов, даты, дедуп)
+tests/          — 7 тестов (RSS, Atom с namespace, кодировка из байтов, даты, дедуп, подписки на дайджест)
 ```
 
 ## Планы развития
@@ -15027,7 +15174,7 @@ tests/          — 6 тестов (RSS, Atom с namespace, кодировка �
 
 ## Тесты
 
-`pytest tests/ -q` — 6 тестов. GitHub Actions прогоняет их при каждом push.
+`pytest tests/ -q` — 7 тестов. GitHub Actions прогоняет их при каждом push.
 
 
 ======================================================================
@@ -15043,6 +15190,7 @@ aiosqlite (дедупликация новостей, подписки) + APSche
   /news [URL]       — свежие новости (по умолчанию Lenta.ru)
   /sources          — встроенные ленты (бесплатные, без ключа)
   /digest on|off    — ежедневный дайджест подписанных лент (в 9:00)
+  /mysubs           — на какие ленты включён дайджест
   /latest           — последние сохранённые новости из БД
   /stats            — сколько новостей уже обработано
 
@@ -15112,6 +15260,7 @@ async def cmd_start(message: Message) -> None:
         "/news https://…/rss.xml — своя RSS/Atom лента\n"
         "/sources — встроенные ленты\n"
         "/digest on — ежедневный дайджест (в 9:00)\n"
+        "/mysubs — мои подписки на дайджест\n"
         "/latest — последние сохранённые\n\n"
         f"Источник: <b>{'демо-данные' if fetcher.demo_mode else 'RSS/Atom-ленты'}</b>"
     )
@@ -15166,6 +15315,21 @@ async def cmd_digest(message: Message) -> None:
         f"📬 Дайджест <b>{'включён' if on else 'выключен'}</b> "
         f"(каждый день в {config.DIGEST_HOUR}:00, только новые новости)."
     )
+
+
+@router.message(Command("mysubs"))
+async def cmd_mysubs(message: Message) -> None:
+    """На какие ленты включён дайджест (подписки текущего пользователя)."""
+    subs = await db.user_subscriptions(message.from_user.id)
+    if not subs:
+        await message.answer("Вы не подписаны на дайджест. Включить: /digest on")
+        return
+    lines = [
+        f"• {_html.escape(s['feed_name'] or s['feed_url'], quote=False)} — "
+        f"<code>{_html.escape(s['feed_url'])}</code>"
+        for s in subs
+    ]
+    await message.answer("📬 <b>Ваши подписки на дайджест:</b>\n" + "\n".join(lines))
 
 
 @router.message(Command("latest"))
@@ -15673,6 +15837,144 @@ set "PYTHONIOENCODING=utf-8"
 
 
 ======================================================================
+ФАЙЛ: project9_telegram_news_bot\tests\test_bot_flow.py
+======================================================================
+"""Интеграционный тест сценария подписок на дайджест (команда /mysubs).
+
+Апдейты прогоняются через НАСТОЯЩИЙ Dispatcher (router и хендлеры bot.py),
+исходящие вызовы Bot API перехватываются CapturingSession — сеть не нужна.
+Сценарий: /mysubs (пусто) → /digest on → /mysubs (подписка видна) →
+/digest off → /mysubs (снова пусто).
+"""
+from __future__ import annotations
+
+import asyncio
+import os
+import sys
+from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import bot as botmod  # noqa: E402
+from aiogram import Bot, Dispatcher  # noqa: E402
+from aiogram.client.default import DefaultBotProperties  # noqa: E402
+from aiogram.client.session.base import BaseSession  # noqa: E402
+from aiogram.enums import ParseMode  # noqa: E402
+from aiogram.methods import TelegramMethod  # noqa: E402
+from aiogram.types import Chat, Message, Update, User  # noqa: E402
+from db import Database  # noqa: E402
+from middlewares import LoggingMiddleware, ThrottlingMiddleware  # noqa: E402
+
+USER_ID = 555
+FAKE_TOKEN = "12345:test-only-no-network"
+
+
+class CapturingSession(BaseSession):
+    """Перехватывает исходящие вызовы Bot API и записывает их в self.calls."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls: list[dict] = []
+
+    async def make_request(
+        self, bot: Bot, method: TelegramMethod, timeout: int | None = None
+    ):
+        data = method.model_dump(exclude_none=True)
+        self.calls.append({"method": type(method).__name__, "data": data})
+        if type(method).__name__ == "SendMessage":
+            return Message(
+                message_id=1,
+                date=datetime.now(),
+                chat=Chat(id=USER_ID, type="private"),
+                text=data.get("text", ""),
+            )
+        return True
+
+    async def close(self) -> None:
+        return None
+
+    async def stream_content(self, url, headers=None, timeout=30, chunk_size=65536, raise_for_status=True):
+        yield b""
+
+
+def _user() -> User:
+    return User(id=USER_ID, is_bot=False, first_name="News", username="news_tester")
+
+
+def _chat() -> Chat:
+    return Chat(id=USER_ID, type="private")
+
+
+def _msg(text: str, mid: int, upd: int) -> Update:
+    return Update(
+        update_id=upd,
+        message=Message(
+            message_id=mid,
+            date=datetime.now(),
+            chat=_chat(),
+            from_user=_user(),
+            text=text,
+        ),
+    )
+
+
+def _texts(session: CapturingSession) -> list[str]:
+    return [c["data"].get("text", "") for c in session.calls if c["method"] == "SendMessage"]
+
+
+# Роутер бота можно прикрепить только к ОДНОМУ Dispatcher'у (aiogram кидает
+# RuntimeError при повторном include_router) — создаём один раз на модуль.
+DP = Dispatcher()
+DP.include_router(botmod.router)
+DP.message.middleware(ThrottlingMiddleware(min_interval=0.0))
+DP.update.middleware(LoggingMiddleware())
+
+
+def test_digest_subscriptions_flow(tmp_path) -> None:
+    """/mysubs показывает и скрывает подписки на дайджест пользователя."""
+    db_path = str(tmp_path / "news.db")
+
+    async def run() -> None:
+        botmod.db = Database(db_path)
+        await botmod.db.init()
+        session = CapturingSession()
+        bot = Bot(
+            token=FAKE_TOKEN,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+            session=session,
+        )
+        upd = mid = 0
+
+        # /mysubs до подписки — понятный ответ
+        await DP.feed_update(bot, _msg("/mysubs", mid := mid + 1, upd := upd + 1))
+        assert any("не подписаны на дайджест" in t for t in _texts(session))
+
+        # /digest on — подписка создана
+        session.calls.clear()
+        await DP.feed_update(bot, _msg("/digest on", mid := mid + 1, upd := upd + 1))
+        assert any("Дайджест <b>включён</b>" in t for t in _texts(session))
+
+        # /mysubs — подписка видна (имя ленты + URL)
+        session.calls.clear()
+        await DP.feed_update(bot, _msg("/mysubs", mid := mid + 1, upd := upd + 1))
+        texts = _texts(session)
+        assert any("Ваши подписки на дайджест" in t for t in texts)
+        assert any("Lenta.ru" in t and "lenta.ru/rss" in t for t in texts)
+
+        # /digest off — отписка; /mysubs снова пуст
+        session.calls.clear()
+        await DP.feed_update(bot, _msg("/digest off", mid := mid + 1, upd := upd + 1))
+        assert any("Дайджест <b>выключен</b>" in t for t in _texts(session))
+        session.calls.clear()
+        await DP.feed_update(bot, _msg("/mysubs", mid := mid + 1, upd := upd + 1))
+        assert any("не подписаны на дайджест" in t for t in _texts(session))
+
+        await bot.session.close()
+
+    asyncio.run(run())
+
+
+======================================================================
 ФАЙЛ: project9_telegram_news_bot\tests\test_rss.py
 ======================================================================
 """Тесты News Bot: парсинг RSS/Atom, дедупликация, подписки."""
@@ -15860,3 +16162,4 @@ def async_retry(
         return wrapper
 
     return decorator
+
