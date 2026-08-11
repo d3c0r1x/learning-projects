@@ -37,6 +37,7 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
+
 ======================================================================
 ФАЙЛ: README.md
 ======================================================================
@@ -77,7 +78,7 @@ Desktop.ini
 - **тесты и CI** — `pytest` + `compileall` при каждом push в каждом репозитории;
 - **Dockerfile и pyproject.toml** — возможность запуска в любом окружении.
 
-Итого **122 unit-теста** (9+8+9+5+12+9+9+9+6+19+27) + изолированный валидатор. В Проектах 5, 10 и 11 — интеграционные тесты полных игровых/рабочих сценариев через настоящий Dispatcher с перехватом исходящих вызовов Bot API. В каждом README — раздел «Технические особенности» с описанием выявленных ограничений и решений, а также «Планы развития».
+Итого **126 unit-тестов** (10+9+9+5+12+9+9+9+7+19+28) + изолированный валидатор. В Проектах 5, 10 и 11 — интеграционные тесты полных игровых/рабочих сценариев через настоящий Dispatcher с перехватом исходящих вызовов Bot API. В каждом README — раздел «Технические особенности» с описанием выявленных ограничений и решений, а также «Планы развития».
 
 ## Примечания о публичных API (проверено 2026-08-05/08)
 
@@ -113,6 +114,7 @@ python bot.py
 - бот для напоминаний/трекеров привычек;
 - «техподдержка» на основе FAQ-базы в SQLite;
 - сравнение по конкретному артикулу (не только по текстовому запросу).
+
 
 ======================================================================
 ФАЙЛ: _validate.py
@@ -526,6 +528,7 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
+
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\.dockerignore
 ======================================================================
@@ -537,6 +540,7 @@ __pycache__/
 .venv/
 tests/
 .git/
+
 
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\.env.example
@@ -570,6 +574,7 @@ OZON_ADMIN_IDS=
 # TTL кэша карточек Ozon (секунды)
 OZON_CACHE_TTL_SECONDS=300
 
+
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\.gitignore
 ======================================================================
@@ -582,6 +587,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+
 
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\Dockerfile
@@ -597,6 +603,7 @@ COPY . .
 
 # docker run -e OZON_BOT_TOKEN=... -e OZON_DEMO_MODE=1 ...
 CMD ["python", "bot.py"]
+
 
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\README.md
@@ -697,6 +704,7 @@ python bot.py
 - агрегация динамики цен в виде графика (matplotlib);
 - интеграция с официальным Seller API Ozon для мониторинга собственных товаров.
 
+
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\alerts.py
 ======================================================================
@@ -767,6 +775,7 @@ def should_notify(
         except ValueError:
             pass  # битая дата — не мешаем уведомлению
     return True, messages
+
 
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\bot.py
@@ -1119,6 +1128,7 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
+
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\config.py
 ======================================================================
@@ -1156,6 +1166,7 @@ THROTTLE_MIN_INTERVAL = float(os.getenv("OZON_THROTTLE_MIN_INTERVAL", "0.7"))
 ADMIN_IDS = [int(x) for x in os.getenv("OZON_ADMIN_IDS", "").split(",") if x.strip().isdigit()]
 # TTL кэша карточек Ozon (секунды)
 CACHE_TTL_SECONDS = float(os.getenv("OZON_CACHE_TTL_SECONDS", "300"))
+
 
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\db.py
@@ -1441,6 +1452,7 @@ class Database:
             "thresholds": thresholds, "users": users,
         }
 
+
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\middlewares.py
 ======================================================================
@@ -1513,6 +1525,7 @@ class LoggingMiddleware(BaseMiddleware):
             type(event).__name__, user_id, elapsed_ms,
         )
         return result
+
 
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\ozon_api.py
@@ -1899,6 +1912,7 @@ class MockOzonClient:
     async def aclose(self) -> None:
         return None
 
+
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\pyproject.toml
 ======================================================================
@@ -1912,6 +1926,7 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 addopts = "-q"
 
+
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\requirements.txt
 ======================================================================
@@ -1920,6 +1935,7 @@ httpx>=0.27
 curl_cffi>=0.16   # антибот-обход: имитация TLS/HTTP2-отпечатка Chrome
 aiosqlite>=0.20
 apscheduler>=3.10,<4
+
 
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\run_bot10.cmd
@@ -1944,6 +1960,7 @@ set "PYTHONIOENCODING=utf-8"
 
 ..\.venv\Scripts\python.exe -u bot.py
 
+
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\tests\conftest.py
 ======================================================================
@@ -1952,6 +1969,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\tests\test_db_and_alerts.py
@@ -2099,6 +2117,7 @@ def test_should_notify_low_stock() -> None:
                                  last_alert_at=None, now=now,
                                  low_stock_threshold=5)
     assert notify and any("заканчивается" in m for m in msgs)
+
 
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\tests\test_live_flow.py
@@ -2391,6 +2410,7 @@ def test_command_errors_and_empty_states(tmp_path) -> None:
 
     asyncio.run(run())
 
+
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\tests\test_ozon_api.py
 ======================================================================
@@ -2553,6 +2573,7 @@ def test_mock_client_fields() -> None:
     assert product["stock"] >= 0
     assert "mock" in product["title"].lower()
 
+
 ======================================================================
 ФАЙЛ: project10_ozon_price_tracker\utils.py
 ======================================================================
@@ -2648,6 +2669,7 @@ def async_retry(
 
     return decorator
 
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\.dockerignore
 ======================================================================
@@ -2659,6 +2681,7 @@ __pycache__/
 .venv/
 tests/
 .git/
+
 
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\.env.example
@@ -2696,6 +2719,7 @@ MARKET_ADMIN_IDS=
 # TTL кэша поисковых выдач (секунды)
 MARKET_CACHE_TTL_SECONDS=300
 
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\.gitignore
 ======================================================================
@@ -2708,6 +2732,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+
 
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\Dockerfile
@@ -2723,6 +2748,7 @@ COPY . .
 
 # docker run -e MARKET_BOT_TOKEN=... -e MARKET_DEMO_MODE=1 ...
 CMD ["python", "bot.py"]
+
 
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\README.md
@@ -2829,6 +2855,7 @@ python bot.py
 - график динамики лучшей цены по подписке;
 - учёт стоимости доставки в итоговом сравнении.
 
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\adapters\__init__.py
 ======================================================================
@@ -2842,6 +2869,7 @@ __all__ = [
     "WbAdapter", "MockWbAdapter",
     "YandexAdapter", "MockYandexAdapter",
 ]
+
 
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\adapters\base.py
@@ -2985,6 +3013,7 @@ class BaseAdapter:
 
     async def aclose(self) -> None:
         await self._transport.aclose()
+
 
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\adapters\ozon.py
@@ -3165,6 +3194,7 @@ class MockOzonAdapter:
     async def aclose(self) -> None:
         return None
 
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\adapters\wb.py
 ======================================================================
@@ -3273,6 +3303,7 @@ class MockWbAdapter:
 
     async def aclose(self) -> None:
         return None
+
 
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\adapters\yandex.py
@@ -3385,6 +3416,7 @@ class MockYandexAdapter:
     async def aclose(self) -> None:
         return None
 
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\alerts.py
 ======================================================================
@@ -3433,6 +3465,7 @@ def should_notify(
         except ValueError:
             pass  # битая дата — не мешаем уведомлению
     return True, messages
+
 
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\bot.py
@@ -3559,7 +3592,9 @@ async def cmd_search(message: Message) -> None:
     if not query:
         await message.answer("Формат: /search ЗАПРОС (например, /search наушники беспроводные)")
         return
-    await message.answer(f"🔍 Ищу «{query}» на Wildberries, Ozon и Яндекс Маркете…")
+    await message.answer(
+        f"🔍 Ищу «{_html.escape(query, quote=False)}» на Wildberries, Ozon и Яндекс Маркете…"
+    )
     products, best = await _compare_cached(query)
     if not products:
         await message.answer(
@@ -3602,7 +3637,7 @@ async def cmd_watch(message: Message) -> None:
     await db.save_check(watch_id, best_price, best.marketplace if best else "—")
     await db.update_last_notified(watch_id, best_price)
     txt = (
-        f"✅ Подписка #{watch_id} на запрос «{query}» создана.\n"
+        f"✅ Подписка #{watch_id} на запрос «{_html.escape(query, quote=False)}» создана.\n"
         f"Текущая лучшая цена: <b>{best_price} ₽</b>"
         + (f" ({best.marketplace.upper()})" if best else "")
     )
@@ -3785,6 +3820,7 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\comparator.py
 ======================================================================
@@ -3853,6 +3889,7 @@ async def compare(
     merged = merge_results(*per_market)
     return merged, best_deal(merged)
 
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\config.py
 ======================================================================
@@ -3892,6 +3929,7 @@ THROTTLE_MIN_INTERVAL = float(os.getenv("MARKET_THROTTLE_MIN_INTERVAL", "0.7"))
 ADMIN_IDS = [int(x) for x in os.getenv("MARKET_ADMIN_IDS", "").split(",") if x.strip().isdigit()]
 # TTL кэша поисковых выдач (секунды)
 CACHE_TTL_SECONDS = float(os.getenv("MARKET_CACHE_TTL_SECONDS", "300"))
+
 
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\db.py
@@ -4068,6 +4106,7 @@ class Database:
                 users = (await cur.fetchone())[0]
         return {"watches": watches, "history": history, "users": users}
 
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\middlewares.py
 ======================================================================
@@ -4140,6 +4179,7 @@ class LoggingMiddleware(BaseMiddleware):
         )
         return result
 
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\models.py
 ======================================================================
@@ -4176,6 +4216,7 @@ class Product(BaseModel):
             return None
         return round((1 - self.price / self.old_price) * 100)
 
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\pyproject.toml
 ======================================================================
@@ -4189,6 +4230,7 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 addopts = "-q"
 
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\requirements.txt
 ======================================================================
@@ -4198,6 +4240,7 @@ curl_cffi>=0.16   # антибот-обход: имитация TLS/HTTP2-отп
 aiosqlite>=0.20
 apscheduler>=3.10,<4
 pydantic>=2.0
+
 
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\run_bot11.cmd
@@ -4222,6 +4265,7 @@ set "PYTHONIOENCODING=utf-8"
 
 ..\.venv\Scripts\python.exe -u bot.py
 
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\tests\conftest.py
 ======================================================================
@@ -4230,6 +4274,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\tests\test_adapters.py
@@ -4450,6 +4495,7 @@ def test_mock_adapters_deterministic() -> None:
     assert all(p.marketplace == "ozon" for p in oz)
     assert all(p.marketplace == "yandex" for p in ya)
 
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\tests\test_comparator_db_alerts.py
 ======================================================================
@@ -4619,6 +4665,7 @@ def test_alert_no_change_silent() -> None:
     now = datetime.now(timezone.utc)
     notify, msgs = should_notify(3000, 3000, None, now=now)
     assert not notify and msgs == []
+
 
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\tests\test_live_flow.py
@@ -4891,6 +4938,46 @@ def test_watch_requires_query(tmp_path) -> None:
 
     asyncio.run(run())
 
+def test_search_and_watch_escape_special_chars(tmp_path) -> None:
+    """Запрос с HTML-спецсимволами (&, теги) экранируется в ответах.
+
+    Без экранирования «&» в ParseMode.HTML — битая entity: Telegram вернул бы
+    400 «can't parse entities» и сообщение бы не ушло. Проверяем через
+    настоящий Dispatcher, что в текст уходит экранированная версия.
+    """
+    db_path = str(tmp_path / "cmp.db")
+
+    async def run() -> None:
+        _reset_state(db_path)
+        await botmod.db.init()
+        session = CapturingSession()
+        bot = _make_bot(session)
+        dp = DP
+
+        upd = mid = 0
+        # /search с «&» — запрос экранирован, сырой & не уходит
+        await dp.feed_update(bot, _msg_update("/search S&P 500", mid := mid + 1, upd := upd + 1))
+        texts = _send_texts(session)
+        assert any("S&amp;P 500" in t for t in texts)
+        assert not any("Ищу «S&P 500»" in t for t in texts)
+
+        # /watch с «&» — экранирование и в подтверждении подписки
+        session.calls.clear()
+        await dp.feed_update(bot, _msg_update("/watch S&P игрушка", mid := mid + 1, upd := upd + 1))
+        texts = _send_texts(session)
+        assert any("S&amp;P игрушка" in t and "создана" in t for t in texts)
+
+        # запрос с тегами — рендерится как текст, а не как HTML
+        session.calls.clear()
+        await dp.feed_update(bot, _msg_update("/search <b>наушники</b>", mid := mid + 1, upd := upd + 1))
+        texts = _send_texts(session)
+        assert any("&lt;b&gt;наушники&lt;/b&gt;" in t for t in texts)
+
+        await bot.session.close()
+
+    asyncio.run(run())
+
+
 ======================================================================
 ФАЙЛ: project11_marketplace_compare\utils.py
 ======================================================================
@@ -4982,6 +5069,7 @@ def async_retry(
 
     return decorator
 
+
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\.dockerignore
 ======================================================================
@@ -4993,6 +5081,7 @@ __pycache__/
 .venv/
 tests/
 .git/
+
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\.env.example
@@ -5025,6 +5114,7 @@ WB_ADMIN_IDS=
 # TTL кэша карточек WB (секунды)
 WB_CACHE_TTL_SECONDS=300
 
+
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\.gitignore
 ======================================================================
@@ -5047,6 +5137,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 
+
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\Dockerfile
 ======================================================================
@@ -5063,6 +5154,7 @@ COPY . .
 # Токен и режим задаются при запуске:
 #   docker run -e WB_BOT_TOKEN=... -e WB_DEMO_MODE=1 ...
 CMD ["python", "bot.py"]
+
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\README.md
@@ -5124,7 +5216,7 @@ db.py           — aiosqlite: товары, история цен, индекс
 middlewares.py  — троттлинг (защита от спама) и логирование
 config.py       — переменные окружения с дефолтами
 utils.py        — TTL-кэш карточек и retry с джиттером на чистом stdlib
-tests/          — 9 тестов (парсинг ответа WB, кулдаун, БД, извлечение артикула)
+tests/          — 10 тестов (парсинг ответа WB, кулдаун, БД, извлечение артикула, fallback цены)
 ```
 
 ## Технические особенности
@@ -5140,7 +5232,8 @@ tests/          — 9 тестов (парсинг ответа WB, кулдау
 
 ## Тесты
 
-`pytest tests/ -q` — 9 тестов. GitHub Actions прогоняет их (compileall + pytest) при каждом push.
+`pytest tests/ -q` — 10 тестов. GitHub Actions прогоняет их (compileall + pytest) при каждом push.
+
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\alerts.py
@@ -5192,6 +5285,7 @@ def should_notify(
         except ValueError:
             pass  # битая дата — не мешаем уведомлению
     return True, messages
+
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\bot.py
@@ -5286,8 +5380,7 @@ async def cmd_track(message: Message) -> None:
         return
     await db.upsert_item(card)
     await db.track(message.from_user.id, str(articul))
-    price = int(card.get("priceU", 0) or 0) // 100
-    sale_price = int(card.get("salePriceU", price) or price) // 100
+    price, sale_price = _prices_from_card(card)
     await message.answer(
         "✅ Товар добавлен в отслеживание:\n"
         f"<b>{_html.escape(str(card.get('name')), quote=False)}</b>\n"
@@ -5300,6 +5393,17 @@ async def cmd_track(message: Message) -> None:
 async def _fetch_card(articul: int):
     """Обёртка для TTL-кэша: обращается к клиенту WB (mock или реальному)."""
     return await wb.get_card(articul)
+
+
+def _prices_from_card(card: dict) -> tuple[int, int]:
+    """(обычная цена, цена со скидкой) в рублях из карточки WB (копейки).
+
+    Если salePriceU равен 0 или отсутствует — берём priceU (товар без скидки).
+    Иначе цена «упадёт» до 0 и бот будет слать ложные алерты о падении.
+    """
+    price = int(card.get("priceU") or 0) // 100
+    sale_price = int(card.get("salePriceU") or card.get("priceU") or 0) // 100
+    return price, sale_price
 
 
 @router.message(Command("list"))
@@ -5426,7 +5530,7 @@ async def check_prices(bot: Bot) -> None:
             continue
         if card is None:
             continue
-        sale_price = int(card.get("salePriceU", card.get("priceU", 0)) or 0) // 100
+        _, sale_price = _prices_from_card(card)
         qty = int(card.get("qty", 0) or 0)
 
         notify, messages = should_notify(
@@ -5518,6 +5622,7 @@ async def _scheduled_cleanup() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
+
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\config.py
 ======================================================================
@@ -5560,6 +5665,7 @@ THROTTLE_MIN_INTERVAL = float(os.getenv("WB_THROTTLE_MIN_INTERVAL", "0.7"))
 ADMIN_IDS = [int(x) for x in os.getenv("WB_ADMIN_IDS", "").split(",") if x.strip().isdigit()]
 # TTL кэша карточек WB (секунды): повторный /track того же артикула мгновенный
 CACHE_TTL_SECONDS = float(os.getenv("WB_CACHE_TTL_SECONDS", "300"))
+
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\db.py
@@ -5776,6 +5882,7 @@ class Database:
                 users = (await cur.fetchone())[0]
         return {"items": items, "tracked": tracked, "history": history, "users": users}
 
+
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\middlewares.py
 ======================================================================
@@ -5853,6 +5960,7 @@ class LoggingMiddleware(BaseMiddleware):
         )
         return result
 
+
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\pyproject.toml
 ======================================================================
@@ -5866,6 +5974,7 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 addopts = "-q"
 
+
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\requirements.txt
 ======================================================================
@@ -5874,6 +5983,7 @@ httpx>=0.27
 curl_cffi>=0.16   # антибот-обход: имитация TLS/HTTP2-отпечатка Chrome (см. README)
 aiosqlite>=0.20
 apscheduler>=3.10,<4
+
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\run_bot1.cmd
@@ -5902,6 +6012,7 @@ rem 3) restart this script. Check access with the /diag command in Telegram.
 
 ..\.venv\Scripts\python.exe -u bot.py
 
+
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\tests\conftest.py
 ======================================================================
@@ -5910,6 +6021,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\tests\test_smoke.py
@@ -6125,6 +6237,21 @@ def test_cleanup_history(tmp_path) -> None:
 
     asyncio.run(run())
 
+def test_prices_from_card_falls_back_when_sale_price_zero() -> None:
+    """salePriceU=0 (нет скидки) не должен давать цену 0 — fallback на priceU."""
+    from bot import _prices_from_card
+
+    price, sale_price = _prices_from_card({"priceU": 99900, "salePriceU": 0})
+    assert (price, sale_price) == (999, 999)  # копейки -> рубли, без «0 ₽»
+
+    price, sale_price = _prices_from_card({"priceU": 99900, "salePriceU": 69900})
+    assert (price, sale_price) == (999, 699)
+
+    # salePriceU вовсе отсутствует — тоже fallback на priceU
+    price, sale_price = _prices_from_card({"priceU": 123400})
+    assert (price, sale_price) == (1234, 1234)
+
+
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\utils.py
 ======================================================================
@@ -6232,6 +6359,7 @@ def async_retry(
         return wrapper
 
     return decorator
+
 
 ======================================================================
 ФАЙЛ: project1_wb_price_tracker\wb_api.py
@@ -6543,6 +6671,7 @@ class MockWBClient:
     async def aclose(self) -> None:
         return None
 
+
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\.dockerignore
 ======================================================================
@@ -6554,6 +6683,7 @@ __pycache__/
 .venv/
 tests/
 .git/
+
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\.env.example
@@ -6576,6 +6706,8 @@ OPENAI_MODEL=gpt-4o-mini
 LLM_FALLBACKS=mock
 # Сколько раз переспрашивать LLM при невалидном JSON
 LLM_MAX_RETRIES=2
+# Таймаут на вызов LLM (секунды)
+LLM_TIMEOUT_SECONDS=60
 
 # --- Парсинг и демо ---
 # 1 = демо-режим (отзывы выдуманные, сеть не нужна) | 0 = реальный парсинг WB
@@ -6586,6 +6718,7 @@ ANALYSIS_CACHE_TTL=300
 
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL=0.7
+
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\.gitignore
@@ -6609,6 +6742,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 
+
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\Dockerfile
 ======================================================================
@@ -6622,6 +6756,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 CMD ["python", "bot.py"]
+
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\README.md
@@ -6678,7 +6813,7 @@ models.py       — pydantic-модели: ответ LLM, распределе�
 db.py           — SQLite: история анализов
 middlewares.py  — троттлинг и логирование
 config.py       — настройки из переменных окружения
-tests/          — 8 тестов (валидация JSON, цепочка фолбэков, распределение, артикул/обрезка)
+tests/          — 9 тестов (валидация JSON, цепочка фолбэков, распределение, артикул/обрезка, таймаут LLM)
 ```
 
 ## Технические особенности
@@ -6695,7 +6830,8 @@ tests/          — 8 тестов (валидация JSON, цепочка фо
 
 ## Тесты
 
-`pytest tests/ -q` — 8 тестов. GitHub Actions прогоняет их при каждом push.
+`pytest tests/ -q` — 9 тестов. GitHub Actions прогоняет их при каждом push.
+
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\bot.py
@@ -6928,6 +7064,7 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
+
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\config.py
 ======================================================================
@@ -6962,10 +7099,13 @@ MAX_REVIEWS = int(os.getenv("MAX_REVIEWS", "50"))
 LLM_FALLBACKS = [x.strip() for x in os.getenv("LLM_FALLBACKS", "mock").split(",") if x.strip()]
 # Сколько раз переспрашивать LLM, если JSON не прошёл pydantic-валидацию
 LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+# Таймаут на вызов LLM (секунды): зависший провайдер не должен вешать бота
+LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
 # TTL кэша отзывов по артикулу (секунды)
 ANALYSIS_CACHE_TTL = float(os.getenv("ANALYSIS_CACHE_TTL", "300"))
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
+
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\llm.py
@@ -7059,13 +7199,17 @@ class YandexGPTProvider(LLMProvider):
 
         sdk = YandexMLSDK(folder_id=YANDEX_FOLDER_ID, auth=YANDEX_API_KEY)
         model = sdk.models.completions(YANDEX_MODEL)
-        # SDK синхронный — запускаем в отдельном потоке, чтобы не блокировать event loop
-        result = await asyncio.to_thread(
-            model.run,
-            [
-                {"role": "system", "text": SYSTEM_PROMPT},
-                {"role": "user", "text": _build_user_prompt(reviews, instruction)},
-            ],
+        # SDK синхронный — запускаем в отдельном потоке, чтобы не блокировать event
+        # loop, и ограничиваем время вызова таймаутом (зависший SDK не вешает бота)
+        result = await asyncio.wait_for(
+            asyncio.to_thread(
+                model.run,
+                [
+                    {"role": "system", "text": SYSTEM_PROMPT},
+                    {"role": "user", "text": _build_user_prompt(reviews, instruction)},
+                ],
+            ),
+            timeout=config.LLM_TIMEOUT_SECONDS,
         )
         text = result.alternatives[0].text
         return AnalysisResult.model_validate(extract_json(text))
@@ -7223,6 +7367,7 @@ async def analyze_with_retry(
             )
     raise RuntimeError("LLM не вернул валидный JSON после всех попыток") from last
 
+
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\middlewares.py
 ======================================================================
@@ -7290,6 +7435,7 @@ class LoggingMiddleware(BaseMiddleware):
         )
         return result
 
+
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\models.py
 ======================================================================
@@ -7326,6 +7472,7 @@ class AnalysisResult(BaseModel):
     )
     summary: str = Field(default="", description="Короткое резюме анализа")
 
+
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\pyproject.toml
 ======================================================================
@@ -7339,6 +7486,7 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 addopts = "-q"
 
+
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\requirements.txt
 ======================================================================
@@ -7351,6 +7499,7 @@ openai>=1.30
 
 # Для LLM_PROVIDER=yandex (тяжёлая, ставится отдельно при необходимости):
 # yandex-cloud-ml-sdk
+
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\reviews.py
@@ -7504,6 +7653,7 @@ def mock_reviews(n: int = config.MAX_REVIEWS) -> list[dict]:
         reviews.append({"text": text, "productValuation": rating})
     return reviews
 
+
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\tests\conftest.py
 ======================================================================
@@ -7512,6 +7662,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\tests\test_smoke.py
@@ -7656,6 +7807,52 @@ def test_reviews_cache_ttl() -> None:
 
     asyncio.run(run())
 
+def test_yandex_provider_timeout(monkeypatch) -> None:
+    """Зависший YandexGPT не вешает бота — срабатывает LLM_TIMEOUT_SECONDS."""
+    import sys
+    import threading
+    import types
+
+    import config as cfg
+    import llm
+
+    release = threading.Event()
+
+    class FakeModel:
+        def run(self, messages):
+            release.wait(10)  # SDK «завис»: блокируется, пока тест не отпустит поток
+            return types.SimpleNamespace(alternatives=[types.SimpleNamespace(text="{}")])
+
+    class FakeMLSDK:
+        def __init__(self, folder_id, auth):
+            pass
+
+        @property
+        def models(self):
+            return types.SimpleNamespace(completions=lambda name: FakeModel())
+
+    mod = types.ModuleType("yandex_cloud_ml_sdk")
+    mod.YandexMLSDK = FakeMLSDK
+    monkeypatch.setitem(sys.modules, "yandex_cloud_ml_sdk", mod)
+    monkeypatch.setattr(llm, "YANDEX_FOLDER_ID", "folder")
+    monkeypatch.setattr(llm, "YANDEX_API_KEY", "key")
+    monkeypatch.setattr(cfg, "LLM_TIMEOUT_SECONDS", 0.05)
+
+    async def run() -> None:
+        timed_out = False
+        try:
+            await llm.YandexGPTProvider().analyze(
+                [{"text": "ок", "productValuation": 5}]
+            )
+        except Exception as exc:  # noqa: BLE001
+            timed_out = "Timeout" in type(exc).__name__
+        finally:
+            release.set()  # отпускаем зависший поток в to_thread
+        assert timed_out, "Таймаут не сработал для зависшего провайдера"
+
+    asyncio.run(run())
+
+
 ======================================================================
 ФАЙЛ: project2_ai_review_analyst\utils.py
 ======================================================================
@@ -7742,6 +7939,7 @@ def async_retry(
 
     return decorator
 
+
 ======================================================================
 ФАЙЛ: project3_pdf_reports\.dockerignore
 ======================================================================
@@ -7757,6 +7955,7 @@ __pycache__/
 tests/
 .git/
 
+
 ======================================================================
 ФАЙЛ: project3_pdf_reports\.env.example
 ======================================================================
@@ -7768,6 +7967,7 @@ WB_BOT_TOKEN=123456:ABC-DEF...
 THROTTLE_MIN_INTERVAL=0.7
 
 # CLI (без бота): python report.py --input sales.csv --output report.pdf --chart top10.png
+
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\.gitignore
@@ -7796,6 +7996,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 
+
 ======================================================================
 ФАЙЛ: project3_pdf_reports\Dockerfile
 ======================================================================
@@ -7814,6 +8015,7 @@ COPY . .
 
 # CLI без бота: docker run --rm -v $(pwd):/app python report.py --input /app/sales.csv
 CMD ["python", "bot.py"]
+
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\README.md
@@ -7883,6 +8085,7 @@ tests/              — 9 тестов (выручка, топ-10, катего�
 ## Тесты
 
 `pytest tests/ -q` — 9 тестов, включая проверку встроенного шрифта с кириллицей. GitHub Actions прогоняет их при каждом push.
+
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\bot.py
@@ -8017,6 +8220,7 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
+
 ======================================================================
 ФАЙЛ: project3_pdf_reports\config.py
 ======================================================================
@@ -8028,6 +8232,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BOT_TOKEN = os.getenv("WB_BOT_TOKEN", "")
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
+
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\generate_mock_data.py
@@ -8091,6 +8296,7 @@ def main(csv_path: str = CSV_PATH) -> None:
 
 if __name__ == "__main__":
     main()
+
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\middlewares.py
@@ -8156,6 +8362,7 @@ class LoggingMiddleware(BaseMiddleware):
         logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
         return result
 
+
 ======================================================================
 ФАЙЛ: project3_pdf_reports\pyproject.toml
 ======================================================================
@@ -8168,6 +8375,7 @@ requires-python = ">=3.11"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\report.py
@@ -8479,6 +8687,7 @@ if __name__ == "__main__":
         f"({report.margin_percent:.1f}%)"
     )
 
+
 ======================================================================
 ФАЙЛ: project3_pdf_reports\requirements.txt
 ======================================================================
@@ -8486,6 +8695,7 @@ aiogram>=3.4,<4
 pandas>=2.2
 matplotlib>=3.8
 reportlab>=4.1
+
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\sales.csv
@@ -8892,6 +9102,7 @@ reportlab>=4.1
 2026-06-10;Ноутбук-станция;5;249950;192500
 2026-05-09;Наушники AirSound Pro;8;47920;30400
 
+
 ======================================================================
 ФАЙЛ: project3_pdf_reports\tests\conftest.py
 ======================================================================
@@ -8899,6 +9110,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 ======================================================================
 ФАЙЛ: project3_pdf_reports\tests\test_report.py
@@ -9000,6 +9212,7 @@ def test_missing_column_raises_clear_error(tmp_path) -> None:
     with pytest.raises(ValueError, match="столбца"):
         aggregate_sales(str(csv_path))
 
+
 ======================================================================
 ФАЙЛ: project3_pdf_reports\tests\test_smoke.py
 ======================================================================
@@ -9050,6 +9263,7 @@ def test_multi_chunk_date_range(tmp_path) -> None:
     assert report.date_min == "2026-01-01"
     assert report.date_max == "2026-04-01"
 
+
 ======================================================================
 ФАЙЛ: project4_payment_gateway\.dockerignore
 ======================================================================
@@ -9061,6 +9275,7 @@ __pycache__/
 .venv/
 tests/
 .git/
+
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\.env.example
@@ -9089,6 +9304,7 @@ SUBSCRIPTION_DAYS=30
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL=0.7
 
+
 ======================================================================
 ФАЙЛ: project4_payment_gateway\.gitignore
 ======================================================================
@@ -9111,6 +9327,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 
+
 ======================================================================
 ФАЙЛ: project4_payment_gateway\Dockerfile
 ======================================================================
@@ -9125,6 +9342,7 @@ COPY . .
 
 # docker run -e WB_BOT_TOKEN=... -e STAR_PAYMENTS=1 ...
 CMD ["python", "bot.py"]
+
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\README.md
@@ -9191,7 +9409,7 @@ ai_service.py   — заглушка AI-аналитики (в учебной с
 db.py           — подписки, журнал платежей, used_trial, refund_payment
 config.py       — тарифы (TIERS), парсинг payload, настройки
 middlewares.py  — троттлинг и логирование
-tests/          — 6 тестов (парсинг payload, подписки, возвраты, журнал, остаток дней)
+tests/          — 7 тестов (парсинг payload, подписки, возвраты, журнал, остаток дней, идемпотентность)
 ```
 
 ## Планы развития
@@ -9202,7 +9420,8 @@ tests/          — 6 тестов (парсинг payload, подписки, в
 
 ## Тесты
 
-`pytest tests/ -q` — 6 тестов. GitHub Actions прогоняет их при каждом push.
+`pytest tests/ -q` — 7 тестов. GitHub Actions прогоняет их при каждом push.
+
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\ai_service.py
@@ -9284,6 +9503,7 @@ async def run_analysis(articul: int | None = None) -> str:
             "project2_ai_review_analyst лежит рядом и установлены его зависимости). "
             "Запустите bot.py из этой папки для реального анализа.</i>"
         )
+
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\bot.py
@@ -9445,16 +9665,21 @@ async def on_successful_payment(message: Message) -> None:
     if tier is None:  # не должно случиться (валидируется в pre_checkout), но на всякий
         await message.answer("⚠️ Ошибка: неизвестный тариф платежа.")
         return
-    await db.activate(
-        message.from_user.id, message.from_user.username, _days_for(tier)
-    )
-    await db.add_payment(
+    # Идемпотентность: Telegram доставляет апдейты at-least-once — повторная
+    # доставка того же successful_payment не должна продлевать подписку дважды.
+    inserted = await db.add_payment(
         message.from_user.id,
         message.from_user.username,
         payment.total_amount,
         payment.currency,
         tier["key"],
         payment.telegram_payment_charge_id,
+    )
+    if not inserted:
+        await message.answer("ℹ️ Этот платёж уже был обработан ранее.")
+        return
+    await db.activate(
+        message.from_user.id, message.from_user.username, _days_for(tier)
     )
     amount = _format_amount(payment.currency, payment.total_amount)
     await message.answer(
@@ -9611,6 +9836,7 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
+
 ======================================================================
 ФАЙЛ: project4_payment_gateway\config.py
 ======================================================================
@@ -9662,6 +9888,7 @@ def parse_payload(payload: str) -> dict | None:
         return None
     return tier_by_key(payload.split(":", 1)[1])
 
+
 ======================================================================
 ФАЙЛ: project4_payment_gateway\db.py
 ======================================================================
@@ -9710,6 +9937,13 @@ class Database:
                     refunded                   INTEGER NOT NULL DEFAULT 0
                 )
                 """
+            )
+            # Идемпотентность: один charge_id = один платёж. Telegram доставляет
+            # апдейты at-least-once — повторная доставка того же
+            # successful_payment не должна создавать дубликат.
+            await db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_charge "
+                "ON payments (telegram_payment_charge_id)"
             )
             await db.commit()
 
@@ -9785,11 +10019,17 @@ class Database:
         currency: str,
         tier: str,
         charge_id: str,
-    ) -> None:
+    ) -> bool:
+        """Пишет платёж в журнал; True — если запись новая.
+
+        False — платёж с таким charge_id уже был обработан (повторная
+        доставка апдейта Telegram после рестарта бота) — дубликат молча
+        пропускается (INSERT OR IGNORE по уникальному индексу).
+        """
         async with aiosqlite.connect(self.path) as db:
-            await db.execute(
+            cur = await db.execute(
                 """
-                INSERT INTO payments
+                INSERT OR IGNORE INTO payments
                     (user_id, username, amount, currency, tier,
                      telegram_payment_charge_id, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
@@ -9797,6 +10037,7 @@ class Database:
                 (user_id, username or "", amount, currency, tier, charge_id),
             )
             await db.commit()
+            return cur.rowcount > 0
 
     async def payment_history(self, user_id: int, limit: int = 10) -> list[dict]:
         async with aiosqlite.connect(self.path) as db:
@@ -9835,6 +10076,7 @@ class Database:
             )
             await db.commit()
             return cur.rowcount > 0
+
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\middlewares.py
@@ -9900,6 +10142,7 @@ class LoggingMiddleware(BaseMiddleware):
         logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
         return result
 
+
 ======================================================================
 ФАЙЛ: project4_payment_gateway\pyproject.toml
 ======================================================================
@@ -9913,11 +10156,13 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 addopts = "-q"
 
+
 ======================================================================
 ФАЙЛ: project4_payment_gateway\requirements.txt
 ======================================================================
 aiogram>=3.4,<4
 aiosqlite>=0.20
+
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\tests\conftest.py
@@ -9927,6 +10172,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 ======================================================================
 ФАЙЛ: project4_payment_gateway\tests\test_smoke.py
@@ -10032,6 +10278,27 @@ def test_status_helpers() -> None:
     assert _tier_label("pro") == "Про (90 дней)"
     assert _tier_label("неизвестный") == "неизвестный"
 
+def test_payment_idempotency(tmp_path) -> None:
+    """Повторная доставка одного successful_payment не дублирует платёж.
+
+    Telegram доставляет апдейты at-least-once: после рестарта бота тот же
+    successful_payment может прийти снова. add_payment должен вернуть False
+    и не создать вторую запись — иначе подписка продлится дважды.
+    """
+    async def run() -> None:
+        db = _make_db(tmp_path)
+        await db.init()
+        assert await db.add_payment(1, "alice", 50, "XTR", "starter", "charge-1") is True
+        assert await db.add_payment(1, "alice", 50, "XTR", "starter", "charge-1") is False
+        hist = await db.payment_history(1)
+        assert len(hist) == 1  # дубликат не создан
+        # другой платёж (новый charge_id) — проходит нормально
+        assert await db.add_payment(1, "alice", 120, "XTR", "pro", "charge-2") is True
+        assert len(await db.payment_history(1)) == 2
+
+    asyncio.run(run())
+
+
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\.dockerignore
 ======================================================================
@@ -10043,6 +10310,7 @@ __pycache__/
 .venv/
 tests/
 .git/
+
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\.env.example
@@ -10064,6 +10332,7 @@ QUIZ_DIFFICULTY=any
 QUIZ_GAME_TTL_SECONDS=1800
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL=0.7
+
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\.gitignore
@@ -10087,6 +10356,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 
+
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\Dockerfile
 ======================================================================
@@ -10101,6 +10371,7 @@ COPY . .
 
 # docker run -e QUIZ_BOT_TOKEN=... -e QUIZ_DEMO_MODE=1 ...
 CMD ["python", "bot.py"]
+
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\README.md
@@ -10172,6 +10443,7 @@ tests/          — 12 тестов (8 unit + 4 интеграционных)
 ## Тесты
 
 `pytest tests/ -q` — 12 тестов. GitHub Actions прогоняет их при каждом push.
+
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\bot.py
@@ -10527,6 +10799,7 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
+
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\config.py
 ======================================================================
@@ -10558,6 +10831,7 @@ DEFAULT_DIFFICULTY = os.getenv("QUIZ_DIFFICULTY", "any")
 GAME_TTL_SECONDS = float(os.getenv("QUIZ_GAME_TTL_SECONDS", "1800"))
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
+
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\db.py
@@ -10690,6 +10964,7 @@ class Database:
                 rows = await cur.fetchall()
         return [(r[0] or f"user_{r[1]}", r[1]) for r in rows]
 
+
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\middlewares.py
 ======================================================================
@@ -10754,6 +11029,7 @@ class LoggingMiddleware(BaseMiddleware):
         logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
         return result
 
+
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\pyproject.toml
 ======================================================================
@@ -10766,6 +11042,7 @@ requires-python = ">=3.11"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\quiz_api.py
@@ -10903,6 +11180,7 @@ class QuizClient:
             for text, options, correct in pool[:amount]
         ]
 
+
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\requirements.txt
 ======================================================================
@@ -10910,6 +11188,7 @@ aiogram>=3.4,<4
 aiosqlite>=0.20
 httpx>=0.27
 pydantic>=2.0
+
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\run_bot5.cmd
@@ -10934,6 +11213,7 @@ set "PYTHONIOENCODING=utf-8"
 
 ..\.venv\Scripts\python.exe -u bot.py
 
+
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\tests\conftest.py
 ======================================================================
@@ -10941,6 +11221,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\tests\test_live_flow.py
@@ -11307,6 +11588,7 @@ def test_double_click_same_button_ignored(tmp_path) -> None:
 
     asyncio.run(run())
 
+
 ======================================================================
 ФАЙЛ: project5_telegram_quiz_bot\tests\test_quiz.py
 ======================================================================
@@ -11441,6 +11723,7 @@ def test_paginate_helper() -> None:
     empty, total, prev, nxt = paginate([], 1)
     assert empty == [] and total == 1 and not prev and not nxt
 
+
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\.dockerignore
 ======================================================================
@@ -11452,6 +11735,7 @@ __pycache__/
 .venv/
 tests/
 .git/
+
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\.env.example
@@ -11475,6 +11759,7 @@ ALERT_CHECK_MINUTES=60
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL=0.7
 
+
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\.gitignore
 ======================================================================
@@ -11497,6 +11782,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 
+
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\Dockerfile
 ======================================================================
@@ -11511,6 +11797,7 @@ COPY . .
 
 # docker run -e CURRENCY_BOT_TOKEN=... -e CURRENCY_DEMO_MODE=1 ...
 CMD ["python", "bot.py"]
+
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\README.md
@@ -11583,6 +11870,7 @@ tests/          — 9 тестов (парсинг XML, кодировка, но
 
 `pytest tests/ -q` — 9 тестов. GitHub Actions прогоняет их при каждом push.
 
+
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\alerts.py
 ======================================================================
@@ -11639,6 +11927,7 @@ def evaluate_alerts(rates: dict[str, Rate], alerts: list[dict]) -> list[dict]:
         elif alert["direction"] == "above" and current > alert["threshold"]:
             triggered.append({**alert, "current": current})
     return triggered
+
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\bot.py
@@ -12036,6 +12325,7 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
+
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\cbr_api.py
 ======================================================================
@@ -12176,6 +12466,7 @@ class CbrClient:
             return None
         return amount * src.per_one / dst.per_one
 
+
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\config.py
 ======================================================================
@@ -12208,6 +12499,7 @@ MAIN_CURRENCIES = os.getenv(
 ALERT_CHECK_MINUTES = int(os.getenv("ALERT_CHECK_MINUTES", "60"))
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
+
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\db.py
@@ -12392,6 +12684,7 @@ class Database:
             rows = await cur.fetchall()
         return [dict(r) for r in rows]
 
+
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\middlewares.py
 ======================================================================
@@ -12456,6 +12749,7 @@ class LoggingMiddleware(BaseMiddleware):
         logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
         return result
 
+
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\pyproject.toml
 ======================================================================
@@ -12469,6 +12763,7 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 addopts = "-q"
 
+
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\requirements.txt
 ======================================================================
@@ -12477,6 +12772,7 @@ aiosqlite>=0.20
 httpx>=0.27
 APScheduler>=3.10,<4
 pydantic>=2.0
+
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\run_bot6.cmd
@@ -12501,6 +12797,7 @@ set "PYTHONIOENCODING=utf-8"
 
 ..\.venv\Scripts\python.exe -u bot.py
 
+
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\tests\conftest.py
 ======================================================================
@@ -12508,6 +12805,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 ======================================================================
 ФАЙЛ: project6_currency_rate_bot\tests\test_cbr.py
@@ -12708,6 +13006,7 @@ def test_parse_alert_args() -> None:
     assert parse_alert_args(["USD", "90", "sideways"]) is None  # неверное направление
     assert parse_alert_args(["USD"]) is None              # мало аргументов
 
+
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\.dockerignore
 ======================================================================
@@ -12719,6 +13018,7 @@ __pycache__/
 .venv/
 tests/
 .git/
+
 
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\.env.example
@@ -12741,6 +13041,7 @@ WEATHER_DEFAULT_CITY=Москва
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL=0.7
 
+
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\.gitignore
 ======================================================================
@@ -12753,6 +13054,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+
 
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\Dockerfile
@@ -12768,6 +13070,7 @@ COPY . .
 
 # docker run -e WEATHER_BOT_TOKEN=... -e WEATHER_DEMO_MODE=1 ...
 CMD ["python", "bot.py"]
+
 
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\README.md
@@ -12832,6 +13135,7 @@ tests/          — 8 тестов (парсинг текущей погоды, 
 ## Тесты
 
 `pytest tests/ -q` — 8 тестов. GitHub Actions прогоняет их при каждом push.
+
 
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\bot.py
@@ -13084,6 +13388,7 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
+
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\config.py
 ======================================================================
@@ -13119,6 +13424,7 @@ CACHE_TTL_SECONDS = float(os.getenv("WEATHER_CACHE_TTL_SECONDS", "1800"))
 THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
 # Город по умолчанию для пользователей без сохранённого города
 DEFAULT_CITY = os.getenv("WEATHER_DEFAULT_CITY", "Москва")
+
 
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\db.py
@@ -13201,6 +13507,7 @@ class Database:
             rows = await cur.fetchall()
         return [dict(r) for r in rows]
 
+
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\middlewares.py
 ======================================================================
@@ -13265,6 +13572,7 @@ class LoggingMiddleware(BaseMiddleware):
         logger.info("Обработка %s: %.1f мс", type(event).__name__, elapsed_ms)
         return result
 
+
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\pyproject.toml
 ======================================================================
@@ -13278,6 +13586,7 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 addopts = "-q"
 
+
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\requirements.txt
 ======================================================================
@@ -13286,6 +13595,7 @@ aiosqlite>=0.20
 httpx>=0.27
 pydantic>=2.0
 APScheduler>=3.10,<4
+
 
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\run_bot7.cmd
@@ -13310,6 +13620,7 @@ set "PYTHONIOENCODING=utf-8"
 
 ..\.venv\Scripts\python.exe -u bot.py
 
+
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\tests\conftest.py
 ======================================================================
@@ -13317,6 +13628,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\tests\test_weather.py
@@ -13455,6 +13767,7 @@ def test_db_city_and_digest(tmp_path) -> None:
 
     asyncio.run(run())
 
+
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\utils.py
 ======================================================================
@@ -13540,6 +13853,7 @@ def async_retry(
         return wrapper
 
     return decorator
+
 
 ======================================================================
 ФАЙЛ: project7_telegram_weather_bot\weather_api.py
@@ -13746,6 +14060,7 @@ class WeatherClient:
             resp.raise_for_status()
             return resp.json()
 
+
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\.dockerignore
 ======================================================================
@@ -13758,6 +14073,7 @@ __pycache__/
 .venv/
 tests/
 .git/
+
 
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\.env.example
@@ -13774,6 +14090,7 @@ EXPENSE_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
 # Лимит суммы одного расхода (защита от опечаток)
 # MAX_AMOUNT=1000000
 
+
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\.gitignore
 ======================================================================
@@ -13787,6 +14104,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+
 
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\Dockerfile
@@ -13802,6 +14120,7 @@ COPY . .
 
 # docker run -e EXPENSE_BOT_TOKEN=... -v expenses_vol:/app ...
 CMD ["python", "bot.py"]
+
 
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\README.md
@@ -13869,6 +14188,7 @@ tests/          — 9 тестов (парсинг суммы с запятой,
 ## Тесты
 
 `pytest tests/ -q` — 9 тестов. GitHub Actions прогоняет их при каждом push.
+
 
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\bot.py
@@ -14076,6 +14396,7 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
+
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\categories.py
 ======================================================================
@@ -14140,6 +14461,7 @@ def parse_expense(text: str, max_amount: float = 1_000_000) -> tuple[float, str,
     note = parts[1].strip() if len(parts) > 1 else ""
     return amount, note, categorize(note)
 
+
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\config.py
 ======================================================================
@@ -14156,6 +14478,7 @@ THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
 
 # Лимит суммы расхода (защита от опечаток вроде /add 500000000)
 MAX_AMOUNT = float(os.getenv("MAX_AMOUNT", "1000000"))
+
 
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\db.py
@@ -14278,6 +14601,7 @@ class Database:
                 writer.writerow([r["created_at"], r["category"], r["amount"], r["note"]])
         return len(rows)
 
+
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\middlewares.py
 ======================================================================
@@ -14342,6 +14666,7 @@ class LoggingMiddleware(BaseMiddleware):
         logger.debug("Update: %s", update.model_dump(exclude_unset=True))
         return await handler(update, data)
 
+
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\pyproject.toml
 ======================================================================
@@ -14355,11 +14680,13 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 addopts = "-q"
 
+
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\requirements.txt
 ======================================================================
 aiogram>=3.4,<4
 aiosqlite>=0.20
+
 
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\run_bot8.cmd
@@ -14381,6 +14708,7 @@ if not defined EXPENSE_BOT_TOKEN (
 set "PYTHONIOENCODING=utf-8"
 
 ..\.venv\Scripts\python.exe -u bot.py
+
 
 ======================================================================
 ФАЙЛ: project8_telegram_expense_tracker\tests\test_expenses.py
@@ -14510,6 +14838,7 @@ def test_undo_flow(tmp_path) -> None:
 
     asyncio.run(run())
 
+
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\.dockerignore
 ======================================================================
@@ -14521,6 +14850,7 @@ __pycache__/
 .venv/
 tests/
 .git/
+
 
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\.env.example
@@ -14540,6 +14870,7 @@ NEWS_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
 # Сколько новостей показывать за раз
 # NEWS_MAX_ITEMS=5
 
+
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\.gitignore
 ======================================================================
@@ -14552,6 +14883,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+
 
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\Dockerfile
@@ -14567,6 +14899,7 @@ COPY . .
 
 # docker run -e NEWS_BOT_TOKEN=... -e NEWS_DEMO_MODE=1 ...
 CMD ["python", "bot.py"]
+
 
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\README.md
@@ -14635,6 +14968,7 @@ tests/          — 6 тестов (RSS, Atom с namespace, кодировка �
 ## Тесты
 
 `pytest tests/ -q` — 6 тестов. GitHub Actions прогоняет их при каждом push.
+
 
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\bot.py
@@ -14848,6 +15182,7 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
+
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\config.py
 ======================================================================
@@ -14884,6 +15219,7 @@ DIGEST_HOUR = int(os.getenv("NEWS_DIGEST_HOUR", "9"))
 CACHE_TTL_SECONDS = float(os.getenv("NEWS_CACHE_TTL_SECONDS", "600"))
 # Минимальный интервал между сообщениями пользователя (секунды)
 THROTTLE_MIN_INTERVAL = float(os.getenv("THROTTLE_MIN_INTERVAL", "0.7"))
+
 
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\db.py
@@ -15007,6 +15343,7 @@ class Database:
             rows = await cur.fetchall()
         return [dict(r) for r in rows]
 
+
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\middlewares.py
 ======================================================================
@@ -15070,6 +15407,7 @@ class LoggingMiddleware(BaseMiddleware):
         logger.debug("Update: %s", update.model_dump(exclude_unset=True))
         return await handler(update, data)
 
+
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\pyproject.toml
 ======================================================================
@@ -15083,6 +15421,7 @@ requires-python = ">=3.11"
 testpaths = ["tests"]
 addopts = "-q"
 
+
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\requirements.txt
 ======================================================================
@@ -15091,6 +15430,7 @@ aiosqlite>=0.20
 httpx>=0.27
 pydantic>=2.0
 APScheduler>=3.10,<4
+
 
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\rss_parser.py
@@ -15247,6 +15587,7 @@ class FeedFetcher:
             resp.raise_for_status()
         return parse_feed(resp.content, source or url)
 
+
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\run_bot9.cmd
 ======================================================================
@@ -15269,6 +15610,7 @@ set "NEWS_DEMO_MODE=1"
 set "PYTHONIOENCODING=utf-8"
 
 ..\.venv\Scripts\python.exe -u bot.py
+
 
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\tests\test_rss.py
@@ -15372,6 +15714,7 @@ def test_db_dedup_and_subscriptions(tmp_path):
 
     asyncio.run(run())
 
+
 ======================================================================
 ФАЙЛ: project9_telegram_news_bot\utils.py
 ======================================================================
@@ -15457,4 +15800,3 @@ def async_retry(
         return wrapper
 
     return decorator
-
