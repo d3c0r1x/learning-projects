@@ -5457,6 +5457,17 @@ npm run build      # production-сборка в miniapp/dist
 эндпоинты: `/api/search`, `/api/reviews`, `/api/compare`, `/api/budget` —
 контракт описан в `miniapp/src/api.ts`).
 
+**Развёрнутая версия:** https://d3c0r1x.github.io/smart-shopper/
+(GitHub Pages, ветка `gh-pages` — `index.html` + `assets/` из сборки).
+В Telegram Mini App открывается web_app-кнопкой: кнопка **«🛍 Mini App»**
+в постоянном меню бота и кнопка у поля ввода (`setChatMenuButton`,
+устанавливается автоматически при старте бота). URL настраивается
+переменной `SHOPPER_MINIAPP_URL` (по умолчанию — Pages-URL).
+
+Для подключения к бэкенду задайте при сборке `VITE_API_URL` (ожидаемые
+эндпоинты: `/api/search`, `/api/reviews`, `/api/compare`, `/api/budget` —
+контракт описан в `miniapp/src/api.ts`).
+
 ## HTTP-API для Mini App
 
 Запускается вместе с ботом (один backend, два рендерера):
@@ -6213,6 +6224,7 @@ from typing import Awaitable, Callable
 from aiogram import Bot, Dispatcher, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import MenuButtonWebApp, WebAppInfo
 from aiogram import F
 from aiogram.filters import Command, CommandStart
 from aiohttp import web
@@ -6810,6 +6822,15 @@ async def main() -> None:
     llm.set_profile(saved_profile)
     await orch._db.cleanup_expired()
 
+    # web_app-кнопка у поля ввода (PRD: «раздаёт кнопку открытия Mini App»)
+    try:
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text="🛍 Умный Шоппер",
+                                         web_app=WebAppInfo(url=config.MINIAPP_URL)))
+        logger.info("Mini App привязан: %s", config.MINIAPP_URL)
+    except Exception as exc:  # без прав на изменение меню — не критично
+        logger.warning("set_chat_menu_button не удался: %s", exc)
+
     # HTTP-API для Mini App (один backend, два рендерера)
     ctx = webmod.ApiContext(db, llm, orch, adapters)
     ctx.matcher = lambda target, candidates: compare_across_markets(
@@ -6905,6 +6926,9 @@ CACHE_REVIEWS_TTL = int(os.getenv("SHOPPER_CACHE_REVIEWS_TTL", "86400"))  # 24 �
 # Порт локального HTTP-сервера; VITE_API_URL в Mini App указывает сюда
 # (через HTTPS-туннель в продакшене).
 API_PORT = int(os.getenv("SHOPPER_API_PORT", "8081"))
+# URL Mini App (HTTPS, обязателен для web_app-кнопки Telegram)
+MINIAPP_URL = os.getenv("SHOPPER_MINIAPP_URL",
+                       "https://d3c0r1x.github.io/smart-shopper/")
 # Если задан — Mini App обязан слать его в заголовке X-API-Token.
 API_TOKEN = os.getenv("SHOPPER_API_TOKEN", "")
 # Разрешить анонимный доступ (user_id из query) при невалидном initData —
@@ -7241,21 +7265,30 @@ UX-карта из PRD (раздел 7): «красивые кнопки» = г�
 from __future__ import annotations
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, \
-    KeyboardButton, ReplyKeyboardMarkup
+    KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 
 from models import Product
 
-MENU = ReplyKeyboardMarkup(
-    keyboard=[
+def _menu() -> ReplyKeyboardMarkup:
+    """Постоянное меню + web_app-кнопка Mini App (PRD: кнопка в клавиатуре)."""
+    import config
+    kb = [
         [KeyboardButton(text="📸 Найти по фото"),
          KeyboardButton(text="🔎 Умный поиск")],
         [KeyboardButton(text="⚖️ Сравнить цены"),
          KeyboardButton(text="⭐ Избранное")],
         [KeyboardButton(text="⚙️ Настройки")],
-    ],
-    resize_keyboard=True,
-    input_field_placeholder="Напишите, что ищете…",
-)
+        [KeyboardButton(text="🛍 Mini App",
+                        web_app=WebAppInfo(url=config.MINIAPP_URL))],
+    ]
+    return ReplyKeyboardMarkup(
+        keyboard=kb,
+        resize_keyboard=True,
+        input_field_placeholder="Напишите, что ищете…",
+    )
+
+
+MENU = _menu()
 
 
 def product_card_keyboard(p: Product, *, favored: bool = False) -> InlineKeyboardMarkup:
