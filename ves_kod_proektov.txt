@@ -7513,13 +7513,16 @@ class LLMGateway:
             else VISION_CHAINS[self._profile]
         last_error: Exception | None = None
         deadline = time.monotonic() + config.STRUCTURED_MAX_SECONDS
+        # бюджет списывается один раз на структурный вызов (не на каждую
+        # модель цепочки): иначе 4 неудачные попытки из-за 429 апстрима
+        # сжигали бы лимит в 4 раза быстрее, чем реальные успешные ответы
+        await self._db.budget_increment(day)
         for model in chain:
             if time.monotonic() > deadline:
                 logger.warning("Время вызова %s превысило потолок %.0f с — "
                                "фолбэк на mock", kind, config.STRUCTURED_MAX_SECONDS)
                 break
             await self._throttle()
-            await self._db.budget_increment(day)
             try:
                 # потолок соблюдается и внутри вызова: остаток бюджета
                 remaining = deadline - time.monotonic()
@@ -10736,17 +10739,20 @@ function score(p: Product, q: string): number {
 function launchInfo(): { initData: string; userId: string } {
   try {
     const lp = retrieveLaunchParams();
-    return {
-      initData: String(lp.initDataRaw ?? ""),
-      userId: String(
-        (lp.initData as unknown as { user?: { id?: number } } | undefined)
-          ?.user?.id ?? "",
-      ),
-    };
+    const userId = String(
+      (lp.initData as unknown as { user?: { id?: number } } | undefined)
+        ?.user?.id ?? "",
+    );
+    return { initData: String(lp.initDataRaw ?? ""), userId };
   } catch {
-    return { initData: "", userId: "" };
+    return { initData: "", userId: "1" };
   }
 }
+
+// Вне Telegram (браузерное демо, npm run dev) SDK может вернуть объект без
+// user — подставляем демо-значение user_id; сервер (SHOPPER_API_ALLOW_ANON=1)
+// примет его из query. В реальном Telegram initData валиден и user.id всегда
+// есть — там fallback не срабатывает.
 
 async function getJson<T>(path: string, params: Record<string, string>): Promise<T> {
   const url = new URL(`${API}${path}`);
@@ -10762,7 +10768,7 @@ async function getJson<T>(path: string, params: Record<string, string>): Promise
 
 function authParams(): Record<string, string> {
   const { initData, userId } = launchInfo();
-  return { initData, user_id: userId };
+  return { initData, user_id: userId || "1" };
 }
 
 export async function searchProducts(
@@ -12891,6 +12897,16 @@ def test_cors_headers_and_preflight():
             assert resp.headers.get("Access-Control-Allow-Origin") == "*"
             assert "GET" in resp.headers.get(
                 "Access-Control-Allow-Methods", "")
+
+            # заголовки должны быть и на ОШИБКАХ: браузерный fetch иначе
+            # блокирует ответ как CORS-нарушение (регрессия: 401 без CORS)
+            resp = await client.get(
+                "/api/search",
+                params={"q": "тест"},
+                headers={"Origin": "https://d3c0r1x.github.io"})
+            assert resp.status == 401
+            assert resp.headers.get(
+                "Access-Control-Allow-Origin") == "*"
         finally:
             await client.close()
             await ctx.db.close()
@@ -13120,24 +13136,27 @@ async def _auth_middleware(request: web.Request, handler):
     return await handler(request)
 
 
-@web.middleware
-async def _cors_middleware(request: web.Request, handler):
-    """CORS для Mini App: браузер на другом домене (GitHub Pages) делает
-    fetch на этот API. Разрешаем все источники — токен авторизации
-    (initData / X-API-Token) защищает эндпоинты, cookies не используются."""
-    if request.method == "OPTIONS":
-        return web.Response(headers=_cors_headers())
-    resp = await handler(request)
-    resp.headers.update(_cors_headers())
-    return resp
-
-
 def _cors_headers() -> dict:
     return {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "X-API-Token, Content-Type",
     }
+
+
+async def _on_prepare_cors(request: web.Request, response: web.StreamResponse):
+    """CORS для Mini App: заголовки на ВСЕХ ответах, включая ошибки
+    (HTTPException). Origin в preflight не проверяем — токен авторизации
+    (initData / X-API-Token) защищает эндпоинты, cookies не используются."""
+    response.headers.update(_cors_headers())
+
+
+@web.middleware
+async def _cors_preflight(request: web.Request, handler):
+    """OPTIONS-preflight: короткий ответ с CORS-заголовками."""
+    if request.method == "OPTIONS":
+        return web.Response(headers=_cors_headers())
+    return await handler(request)
 
 
 @web.middleware
@@ -13174,8 +13193,8 @@ CTX_KEY = AppKey("ctx", ApiContext)
 
 def create_app(ctx: ApiContext) -> web.Application:
     app = web.Application(
-        middlewares=[_cors_middleware, _auth_middleware,
-                     _error_middleware])
+        middlewares=[_cors_preflight, _auth_middleware, _error_middleware])
+    app.on_response_prepare.append(_on_prepare_cors)
     app[CTX_KEY] = ctx
     app.router.add_get("/api/search", handle_search)
     app.router.add_get("/api/reviews", handle_reviews)
@@ -13200,8 +13219,11 @@ async def _run_standalone() -> None:
     await db.connect()
     llm = LLMGateway(db)
     orch = Orchestrator(db, llm, build_adapters())
+    from matcher.matcher import compare_across_markets
+
     ctx = ApiContext(db, llm, orch, orch._adapters)
-    ctx.matcher = lambda target, candidates: None  # сравнение цен без LLM
+    ctx.matcher = lambda target, candidates: compare_across_markets(
+        llm, target, candidates)
     app = create_app(ctx)
     runner = web.AppRunner(app)
     await runner.setup()
